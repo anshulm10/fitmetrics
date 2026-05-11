@@ -47,3 +47,11 @@
 - Standardized on `src/fit_support/config.py` for plan compliance.
 - Kept local-first storage with persistent Chroma collections.
 - Preserved modular split between ingestion, embedding, retrieval, and evaluation components.
+
+## Data hygiene (completed)
+- [done] Inspect CSV inputs under `data/raw/lifts/`, `data/raw/workouts/`, `data/raw/metadata/`.
+- [done] Split baseline/PR rows into `data/raw/lifts/strength.csv` (schema: `exercise_name`, `best_weight_kg`, `best_reps`, `notes`).
+- [done] Create `data/raw/workouts/workout_log.csv` for dated session sets only.
+- [done] Normalize `UNKNOWN` to empty, preserve bodyweight context in notes, map names to `exercise_library.csv`.
+- [done] Post-split validation warnings for non-library exercise names.
+- [done] Document data layout in `README.md` and archive legacy `lifts_log.csv` under `data/processed/migrations/`.

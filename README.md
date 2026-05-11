@@ -127,3 +127,29 @@ Build a local-first multimodal RAG fitness assistant that ingests workout histor
 - Added `src/fit_support/ingestion/schemas.py`.
 - Added `data/raw/metadata`.
 - Added `chroma_db`.
+
+## Data architecture
+
+Raw lift and workout data are split by intent so the RAG pipeline can treat baselines differently from session logs.
+
+| Path | Role |
+|------|------|
+| `data/raw/metadata/exercise_library.csv` | Canonical exercise names and attributes (source of truth for naming). |
+| `data/raw/lifts/strength.csv` | Personal baselines, PRs, and max-effort reference rows (`exercise_name`, `best_weight_kg`, `best_reps`, `notes`). |
+| `data/raw/workouts/workout_log.csv` | Dated session sets (`date`, `exercise_name`, `set_number`, `weight_kg`, `reps`, `notes`). |
+| `data/processed/migrations/` | Timestamped backups of merged legacy files (e.g. `lifts_log_backup_*.csv`) before destructive splits. |
+
+Legacy `data/raw/lifts/lifts_log.csv` mixed baselines into a session-shaped schema; `scripts/refactor_lift_workout_data.py` moves baseline/PR rows into `strength.csv`, writes real sessions to `workout_log.csv`, maps `UNKNOWN` to empty fields, normalizes names to the library, and warns on library mismatches. Re-run with `--dry-run` to preview.
+
+### Day 3
+- What was built:
+  - Automated refactor script `scripts/refactor_lift_workout_data.py` (split, clean, validate against `exercise_library.csv`).
+  - `data/raw/lifts/strength.csv` and `data/raw/workouts/workout_log.csv`; legacy `lifts_log.csv` backed up then removed.
+  - `WorkoutIngestor` now ingests `*.csv` session logs under `data/raw/workouts/` in addition to `*.txt`.
+- Issues faced:
+  - Legacy first column was mislabeled (`isdate` vs `date`); script uses the first column as session marker for classification.
+- Fixes:
+  - Classify rows with `BASELINE` / `PR` / baseline-related notes into strength; session-shaped rows go to `workout_log.csv`.
+  - Post-write validation warns if any `exercise_name` is absent from the library.
+- Next milestone:
+  - Wire explicit `record_type` metadata in Chroma for strength vs session chunks if retrieval should rank them differently.
