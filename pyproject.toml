@@ -6,10 +6,15 @@ readme = "README.md"
 requires-python = ">=3.13"
 dependencies = [
     "chromadb>=1.5.9",
+    "langgraph>=0.2.73",
     "numpy>=2.4.4",
     "opencv-python>=4.13.0.92",
     "pandas>=3.0.2",
     "pillow>=12.2.0",
+    "pydantic>=2.12.3",
+    "pydantic-settings>=2.11.0",
+    "pytest>=8.4.2",
     "python-dotenv>=1.2.2",
     "sentence-transformers>=5.4.1",
+    "streamlit>=1.45.1",
 ]
