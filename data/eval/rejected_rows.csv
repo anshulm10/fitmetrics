@@ -1,1 +1,2 @@
 phase,source,row_index,payload_json,errors
+VALIDATE,lifts:strength.csv,9,"{""exercise_name"": ""Seated Cable Row"", ""best_weight_kg"": null, ""best_reps"": null, ""notes"": ""Max stack \u2014 confirm stack weight kg"", ""source_file"": ""lifts:strength.csv""}","duplicate lift row (same exercise, weight, reps, notes)"
