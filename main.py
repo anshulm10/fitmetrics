@@ -1,7 +1,14 @@
 import argparse
 from pprint import pprint
+from pathlib import Path
+import sys
 
-from fit_support.config.settings import AppSettings, load_settings
+ROOT = Path(__file__).resolve().parent
+SRC = ROOT / "src"
+if str(SRC) not in sys.path:
+    sys.path.insert(0, str(SRC))
+
+from fit_support.config import AppSettings, load_settings
 from fit_support.graph.workflow import run_retrieval_workflow
 from fit_support.ingest.pipeline import run_ingestion_pipeline, validate_required_directories
 

@@ -6,7 +6,7 @@ import numpy as np
 from PIL import Image
 from sentence_transformers import SentenceTransformer
 
-from fit_support.config.settings import AppSettings
+from fit_support.config import AppSettings
 
 
 class EmbeddingService:

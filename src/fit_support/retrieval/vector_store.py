@@ -5,7 +5,7 @@ from typing import Any
 
 import chromadb
 
-from fit_support.config.settings import AppSettings
+from fit_support.config import AppSettings
 from fit_support.domain.schemas import ContextChunk, ModalityType
 from fit_support.embeddings.embedder import EmbeddingService
 
@@ -13,7 +13,7 @@ from fit_support.embeddings.embedder import EmbeddingService
 class VectorStore:
     def __init__(self, settings: AppSettings) -> None:
         self._settings = settings
-        self._client = chromadb.PersistentClient(path=str(settings.resolved(settings.chroma_dir)))
+        self._client = chromadb.PersistentClient(path=str(settings.resolved(settings.chroma_db_dir)))
 
     def _collection_name(self, modality: ModalityType) -> str:
         return f"{self._settings.chroma_collection_prefix}_{modality.value}"

@@ -4,7 +4,7 @@ from pathlib import Path
 
 import pandas as pd
 
-from fit_support.config.settings import AppSettings
+from fit_support.config import AppSettings
 from fit_support.ingest.pipeline import run_ingestion_pipeline
 
 

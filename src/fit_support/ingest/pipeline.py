@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from fit_support.config.settings import AppSettings
+from fit_support.config import AppSettings
 from fit_support.domain.schemas import ContextChunk
 from fit_support.embeddings.embedder import EmbeddingService
 from fit_support.ingest.images import ImageIngestor
@@ -14,12 +14,13 @@ from fit_support.retrieval.vector_store import VectorStore
 
 def validate_required_directories(settings: AppSettings) -> None:
     required = [
+        settings.raw_metadata_dir,
         settings.raw_workouts_dir,
         settings.raw_lifts_dir,
         settings.raw_images_dir,
         settings.raw_injuries_dir,
         settings.processed_dir,
-        settings.chroma_dir,
+        settings.chroma_db_dir,
         settings.eval_dir,
     ]
     for rel_path in required:

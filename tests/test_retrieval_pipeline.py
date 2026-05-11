@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from fit_support.config.settings import AppSettings
+from fit_support.config import AppSettings
 from fit_support.retrieval.retrieve import RetrievalService
 
 

@@ -4,7 +4,7 @@ from typing import TypedDict
 
 from langgraph.graph import END, StateGraph
 
-from fit_support.config.settings import AppSettings
+from fit_support.config import AppSettings
 from fit_support.embeddings.embedder import EmbeddingService
 from fit_support.retrieval.retrieve import RetrievalService
 from fit_support.retrieval.vector_store import VectorStore

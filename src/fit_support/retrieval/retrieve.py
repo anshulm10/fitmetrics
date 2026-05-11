@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from fit_support.config.settings import AppSettings
+from fit_support.config import AppSettings
 from fit_support.domain.schemas import ContextChunk, ModalityType
 from fit_support.embeddings.embedder import EmbeddingService
 from fit_support.retrieval.rerank import rerank_with_injury_awareness
