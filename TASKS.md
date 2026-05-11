@@ -1,4 +1,7 @@
-# fit_support Engineering Tasks
+# fit_support TASKS
+
+## Current phase
+- Phase 1 foundation alignment complete; entering iterative hardening.
 
 ## Status legend
 - `todo`
@@ -6,32 +9,41 @@
 - `done`
 - `blocked`
 
-## Phase 1 - Config setup
-- [done] Config setup (`src/fit_support/config/settings.py`)
-- [done] Environment loader
-- [done] Folder validation
+## Checklist by phase
+### Phase 1: Config, env loader, folder validation
+- [done] Implement typed settings in `src/fit_support/config.py`.
+- [done] Add startup validation for required folders (`data/raw/images`, `data/raw/metadata`, `data/processed`, `chroma_db`).
+- [done] Add helper entrypoint in `main.py` to load config and run validation.
 
-## Phase 2 - Ingestion foundations
-- [done] Text ingestion pipeline (`workouts`, `lifts`, `injuries`)
-- [done] Image ingestion pipeline (`images`)
-- [done] Metadata schema (`ContextChunk`)
+### Phase 2: Text + image ingestion + metadata schema
+- [done] Define Pydantic models in `src/fit_support/ingestion/schemas.py`.
+- [done] Define ABC ingestion contracts in `src/fit_support/ingestion/interfaces.py`.
+- [done] Include `BaseIngestionSource`, `TextIngestionSource`, `ImageIngestionSource`, and `MetadataRepository`.
+- [done] Keep loader stubs available for mapping text/image data to validated records.
 
-## Phase 3 - Embedding + vector storage
-- [done] Embedding pipeline (text + image)
-- [done] Chroma vector storage and upsert
+### Phase 3: Embedding + Chroma storage
+- [done] Add text embedding wrapper.
+- [done] Add image embedding wrapper.
+- [done] Create Chroma repository layer for upsert/query.
 
-## Phase 4 - Retrieval engine
-- [done] Retrieval engine scaffold
-- [done] Similarity search across modality collections
+### Phase 4: Retrieval engine + similarity search
+- [done] Implement retrieval service to embed query, search, merge, and rank.
+- [done] Ensure retrieval output remains explainable (id/source/score/metadata).
 
-## Phase 5 - Demo interface
-- [done] Demo CLI query interface
+### Phase 5: Demo CLI query interface
+- [done] Add CLI command for ingestion and query usage in `main.py`.
 
 ## Blockers
-- Need representative raw data files to benchmark retrieval quality.
+- No labeled benchmark dataset yet for robust retrieval metric tuning.
 
 ## Bugs
 - None currently identified.
 
 ## Technical debt
-- Retrieval ranking is basic score fusion and should be upgraded with tuned reranking.
+- Retrieval fusion is basic and should be upgraded (e.g., weighted or reciprocal-rank fusion).
+- Embedding model load can be made lazy/cached to improve cold start.
+
+## Decision log
+- Standardized on `src/fit_support/config.py` for plan compliance.
+- Kept local-first storage with persistent Chroma collections.
+- Preserved modular split between ingestion, embedding, retrieval, and evaluation components.
