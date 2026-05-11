@@ -1,23 +1,35 @@
 import argparse
-from pprint import pprint
-from pathlib import Path
 import sys
+from pathlib import Path
+from pprint import pprint
 
 ROOT = Path(__file__).resolve().parent
 SRC = ROOT / "src"
 if str(SRC) not in sys.path:
     sys.path.insert(0, str(SRC))
 
-from fit_support.config import AppSettings, load_settings
-from fit_support.graph.workflow import run_retrieval_workflow
-from fit_support.ingest.pipeline import run_ingestion_pipeline, validate_required_directories
-
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="fit_support local assistant")
     parser.add_argument("--ingest", action="store_true", help="Run ingestion pipeline")
+    parser.add_argument(
+        "--data-pipeline",
+        action="store_true",
+        help="Phase 1: load/validate/clean raw CSV+JSON to data/processed/*.csv",
+    )
     parser.add_argument("--query", type=str, default="", help="Run retrieval query")
     args = parser.parse_args()
+
+    if args.data_pipeline:
+        from ingestion.pipeline import run_data_ingestion_pipeline
+
+        stats = run_data_ingestion_pipeline(project_root=ROOT)
+        print(f"Data pipeline complete: {stats}")
+        return
+
+    from fit_support.config import AppSettings, load_settings
+    from fit_support.graph.workflow import run_retrieval_workflow
+    from fit_support.ingest.pipeline import run_ingestion_pipeline, validate_required_directories
 
     settings: AppSettings = load_settings()
     validate_required_directories(settings)

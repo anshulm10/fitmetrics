@@ -55,3 +55,13 @@
 - [done] Normalize `UNKNOWN` to empty, preserve bodyweight context in notes, map names to `exercise_library.csv`.
 - [done] Post-split validation warnings for non-library exercise names.
 - [done] Document data layout in `README.md` and archive legacy `lifts_log.csv` under `data/processed/migrations/`.
+
+## Phase 1 — Tabular ingestion pipeline (completed)
+- [done] Add `src/ingestion/` package: `models.py`, `validators.py`, `loaders.py`, `preprocess.py`, `pipeline.py`, `__init__.py`.
+- [done] Pydantic models with validation messages for exercises, lifts, workouts, injuries.
+- [done] Row-level validation: missing fields, duplicates, library name checks, negative numbers, date parsing.
+- [done] Load raw CSV/JSON from lifts, workouts, injuries, metadata directories.
+- [done] Preprocess: name normalization, casing/whitespace, nulls, date coercion.
+- [done] Write `data/processed/{exercises,lifts,workouts,injuries}_clean.csv` and `data/eval/rejected_rows.csv`.
+- [done] Tagged logging `[LOAD]` / `[VALIDATE]` / `[CLEAN]` / `[SAVE]`; resilient to single bad rows.
+- [done] CLI entry: `uv run python main.py --data-pipeline`.

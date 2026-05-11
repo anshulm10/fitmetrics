@@ -138,6 +138,8 @@ Raw lift and workout data are split by intent so the RAG pipeline can treat base
 | `data/raw/lifts/strength.csv` | Personal baselines, PRs, and max-effort reference rows (`exercise_name`, `best_weight_kg`, `best_reps`, `notes`). |
 | `data/raw/workouts/workout_log.csv` | Dated session sets (`date`, `exercise_name`, `set_number`, `weight_kg`, `reps`, `notes`). |
 | `data/processed/migrations/` | Timestamped backups of merged legacy files (e.g. `lifts_log_backup_*.csv`) before destructive splits. |
+| `data/processed/*_clean.csv` | Validated, normalized snapshots produced by `src/ingestion/pipeline.py` (`--data-pipeline`). |
+| `data/eval/rejected_rows.csv` | Rows that failed validation, with JSON payload and error text for debugging. |
 
 Legacy `data/raw/lifts/lifts_log.csv` mixed baselines into a session-shaped schema; `scripts/refactor_lift_workout_data.py` moves baseline/PR rows into `strength.csv`, writes real sessions to `workout_log.csv`, maps `UNKNOWN` to empty fields, normalizes names to the library, and warns on library mismatches. Re-run with `--dry-run` to preview.
 
@@ -153,3 +155,36 @@ Legacy `data/raw/lifts/lifts_log.csv` mixed baselines into a session-shaped sche
   - Post-write validation warns if any `exercise_name` is absent from the library.
 - Next milestone:
   - Wire explicit `record_type` metadata in Chroma for strength vs session chunks if retrieval should rank them differently.
+
+### Day 4 — Phase 1 data ingestion pipeline
+- What was built:
+  - New package `src/ingestion/` with `models.py` (Pydantic: `ExerciseMetadata`, `LiftRecord`, `WorkoutRecord`, `InjuryRecord`), `validators.py`, `loaders.py`, `preprocess.py`, and `pipeline.py`.
+  - End-to-end flow **load → validate → preprocess → save** with tagged logs: `[LOAD]`, `[VALIDATE]`, `[CLEAN]`, `[SAVE]`.
+  - Clean outputs under `data/processed/`: `exercises_clean.csv`, `lifts_clean.csv`, `workouts_clean.csv`, `injuries_clean.csv`.
+  - Rejected rows collected in `data/eval/rejected_rows.csv` (schema: `phase`, `source`, `row_index`, `payload_json`, `errors`) without aborting the whole run.
+  - CLI: `uv run python main.py --data-pipeline` (lazy-imports RAG stack so this path stays lightweight).
+- Architecture:
+  - **Loaders** scan `data/raw/lifts/*.csv`, `data/raw/workouts/*.csv`, `data/raw/injuries/*.json`, and `data/raw/metadata/*.{csv,json}`.
+  - **Preprocess** normalizes whitespace, maps `UNKNOWN` to null, coerces numbers/dates, and fuzzy-maps exercise names to `exercise_library.csv`.
+  - **Validators** combine Pydantic validation with extra checks (non-negative weight/reps, library membership, duplicate keys per stream).
+  - **Pipeline** orchestrates row-by-row handling: bad rows go to `rejected_rows.csv`; good rows accumulate then flush to processed CSVs.
+- Data flow (high level):
+
+```mermaid
+flowchart LR
+    rawDirs[RawCSVandJSON] --> loadStep[Loaders]
+    loadStep --> preStep[Preprocess]
+    preStep --> valStep[Validators]
+    valStep --> goodRows[AcceptedRows]
+    valStep --> badRows[RejectedRowsCSV]
+    goodRows --> procCSV[ProcessedCleanCSVs]
+```
+
+- Issues encountered:
+  - Initial `main.py` always imported LangGraph-backed RAG modules, which added noise when only running the data pipeline.
+  - Empty `workout_log.csv` / injury JSON files needed explicit empty CSV headers on write.
+- Fixes:
+  - Branch `main.py` so `--data-pipeline` only imports `ingestion.pipeline`.
+  - Dedupe strength and workout streams while ingesting; write empty DataFrames with fixed column headers when no rows pass validation.
+- Next milestone:
+  - Point the existing Chroma / embedding ingest path at `data/processed/*.csv` as an optional second stage, or add a small adapter that reads clean files into `ContextChunk` records.
