@@ -4,5 +4,6 @@ __pycache__/
 .env
 data/raw/
 data/processed/
+data/chroma/
 chroma_db/
 .cursor/

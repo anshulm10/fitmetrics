@@ -188,3 +188,33 @@ flowchart LR
   - Dedupe strength and workout streams while ingesting; write empty DataFrames with fixed column headers when no rows pass validation.
 - Next milestone:
   - Point the existing Chroma / embedding ingest path at `data/processed/*.csv` as an optional second stage, or add a small adapter that reads clean files into `ContextChunk` records.
+
+### Day 5 — Phase 2 multimodal embedding + retrieval
+- What was built:
+  - New multimodal modules under `src/embeddings/`: `text_embedder.py`, `image_embedder.py`, `index_builder.py`, `__init__.py`.
+  - New retrieval query surface under `src/retrieval/`: `search.py`, `__init__.py`.
+  - Text embedding index includes exercise metadata (`exercise_name`, `movement_pattern`, `equipment`, `muscle groups`) and lift history (`strength.csv`) in Chroma collection `fitness_text`.
+  - Image embedding index ingests nested image folders under `data/raw/images/` into Chroma collection `fitness_images`.
+  - Index persistence path standardized to `data/chroma/`.
+- Architecture:
+  - **Text model**: `sentence-transformers/all-MiniLM-L6-v2`.
+  - **Image model**: `clip-ViT-B-32` via sentence-transformers (CLIP-compatible).
+  - **Collections**: `fitness_text`, `fitness_images`.
+  - **Stored fields**: `id`, embedding vector, metadata, and `source_path` for provenance.
+- Data flow:
+  - Build records from `exercise_library.csv` + `strength.csv` for text.
+  - Build records from image files recursively for image embeddings.
+  - Upsert both modalities to Chroma, then run retrieval smoke queries.
+- Retrieval examples executed:
+  - `"knee friendly quad exercise"` → top included `Hack Squat`, `Leg Extension`, `Back Squat`.
+  - `"upper chest press"` → top included `Chest Press Machine`, `Incline Chest Press Machine`.
+  - `"lat focused back movement"` → top included `Lat Pulldown` and row-type lift context.
+  - Image query on `bent_over_row/finish.jpeg` returned same-exercise frames (`finish`, `start`, `mid`) as top matches.
+- Issues encountered:
+  - Initial index run was slow because search smoke tests reloaded models repeatedly.
+- Fixes:
+  - Added optional embedder reuse in `retrieval/search.py` and reused existing model instances in `index_builder.py`.
+  - Rebuild now resets `fitness_text` and `fitness_images` before upsert, then verifies expected counts and duplicate-free IDs.
+  - Generated Chroma files under `data/chroma/` are ignored by git; the local DB is rebuilt from raw sources.
+- Next milestone:
+  - Add reranking and modality fusion strategy (text + image + lift priors) for recommendation-time context assembly.

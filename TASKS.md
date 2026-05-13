@@ -65,3 +65,15 @@
 - [done] Write `data/processed/{exercises,lifts,workouts,injuries}_clean.csv` and `data/eval/rejected_rows.csv`.
 - [done] Tagged logging `[LOAD]` / `[VALIDATE]` / `[CLEAN]` / `[SAVE]`; resilient to single bad rows.
 - [done] CLI entry: `uv run python main.py --data-pipeline`.
+
+## Phase 2 — Multimodal embedding + retrieval (completed)
+- [done] Create `src/embeddings/{__init__.py,text_embedder.py,image_embedder.py,index_builder.py}`.
+- [done] Create `src/retrieval/{__init__.py,search.py}`.
+- [done] Build text embeddings from metadata + lift history with `all-MiniLM-L6-v2`.
+- [done] Build image embeddings from nested folders under `data/raw/images/` using CLIP-compatible model.
+- [done] Create and populate Chroma collections `fitness_text` and `fitness_images` under `data/chroma/`.
+- [done] Implement retrieval APIs: `search_exercise_by_text(query)` and `search_similar_exercise_image(image_path)`.
+- [done] Execute required search smoke tests and image retrieval validation during indexing.
+- [done] Keep diagnostic logs `[EMBED TEXT]`, `[EMBED IMAGE]`, `[INDEX]`, `[SEARCH]`.
+- [done] Reset managed Chroma collections before rebuild to avoid stale/incorrect records.
+- [done] Verify `fitness_text` and `fitness_images` collection counts and duplicate-free IDs after indexing.
