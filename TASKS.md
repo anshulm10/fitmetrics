@@ -77,3 +77,12 @@
 - [done] Keep diagnostic logs `[EMBED TEXT]`, `[EMBED IMAGE]`, `[INDEX]`, `[SEARCH]`.
 - [done] Reset managed Chroma collections before rebuild to avoid stale/incorrect records.
 - [done] Verify `fitness_text` and `fitness_images` collection counts and duplicate-free IDs after indexing.
+
+## Rubric alignment — Agent routing and evaluation (completed)
+- [done] Implement query router with `factual_retrieval`, `cross_modal`, `analytical`, `personalized_followup`.
+- [done] Implement tool routing: text retrieval, image retrieval, injury memory, strength progression.
+- [done] Add `tests/benchmark_queries.json` with 11 benchmark queries across all required categories.
+- [done] Implement evaluation comparing plain baseline, text-only retrieval, and full multimodal agent.
+- [done] Compute Recall@3, response relevance, personalization score, and latency.
+- [done] Save evaluation output to `data/eval/results.csv`.
+- [done] Document research question, hypothesis, architecture, methodology, and ablations in `README.md`.

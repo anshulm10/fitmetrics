@@ -1,0 +1,34 @@
+query_id,category,variant,route,query,expected_exercises,retrieved_top3,recall_at_3,response_relevance,personalization_score,latency_ms
+factual_001,factual_retrieval,plain_llm_baseline,factual_retrieval,upper chest press,Incline Chest Press Machine|Dumbbell Incline Bench Press|Barbell Bench Press,Generic coaching advice for,0.0,2,1,0.0
+factual_001,factual_retrieval,text_only_retrieval,factual_retrieval,upper chest press,Incline Chest Press Machine|Dumbbell Incline Bench Press|Barbell Bench Press,Chest Press Machine|Incline Chest Press Machine|Military Press,0.3333,3,3,203.18
+factual_001,factual_retrieval,full_multimodal_agent,factual_retrieval,upper chest press,Incline Chest Press Machine|Dumbbell Incline Bench Press|Barbell Bench Press,Chest Press Machine|Incline Chest Press Machine|Military Press,0.3333,3,3,28.51
+factual_002,factual_retrieval,plain_llm_baseline,factual_retrieval,lat focused back movement,Lat Pulldown|Pull Ups|Bent Over Row|Seated Cable Row,Generic coaching advice for,0.0,2,1,0.0
+factual_002,factual_retrieval,text_only_retrieval,factual_retrieval,lat focused back movement,Lat Pulldown|Pull Ups|Bent Over Row|Seated Cable Row,Lat Pulldown|Machine Row|Lat Pulldown,0.6667,4,3,27.9
+factual_002,factual_retrieval,full_multimodal_agent,factual_retrieval,lat focused back movement,Lat Pulldown|Pull Ups|Bent Over Row|Seated Cable Row,Lat Pulldown|Machine Row|Lat Pulldown,0.6667,4,3,24.32
+factual_003,factual_retrieval,plain_llm_baseline,factual_retrieval,machine quad isolation exercise,Leg Extension|Leg Press|Hack Squat,Generic coaching advice for,0.0,2,1,0.0
+factual_003,factual_retrieval,text_only_retrieval,factual_retrieval,machine quad isolation exercise,Leg Extension|Leg Press|Hack Squat,Ab Crunch Machine|Machine Row|Rear Delt Fly Machine,0.0,2,3,27.56
+factual_003,factual_retrieval,full_multimodal_agent,factual_retrieval,machine quad isolation exercise,Leg Extension|Leg Press|Hack Squat,Ab Crunch Machine|Machine Row|Rear Delt Fly Machine,0.0,2,3,25.91
+cross_001,cross_modal,plain_llm_baseline,cross_modal,find exercise images similar to this bent over row photo,Bent Over Row,Generic coaching advice for,0.0,2,1,0.0
+cross_001,cross_modal,text_only_retrieval,cross_modal,find exercise images similar to this bent over row photo,Bent Over Row,Bent Over Row|Machine Row|Seated Leg Curl,1.0,5,3,28.53
+cross_001,cross_modal,full_multimodal_agent,cross_modal,find exercise images similar to this bent over row photo,Bent Over Row,Bent Over Row|Machine Row|Seated Leg Curl,1.0,5,5,368.16
+cross_002,cross_modal,plain_llm_baseline,cross_modal,match this leg press image to the correct exercise,Leg Press,Generic coaching advice for,0.0,2,1,0.0
+cross_002,cross_modal,text_only_retrieval,cross_modal,match this leg press image to the correct exercise,Leg Press,Leg Press|Single Leg Standing Calf Raise|Leg Extension,1.0,5,3,30.71
+cross_002,cross_modal,full_multimodal_agent,cross_modal,match this leg press image to the correct exercise,Leg Press,Leg Press|Single Leg Standing Calf Raise|Leg Extension,1.0,5,5,273.45
+cross_003,cross_modal,plain_llm_baseline,cross_modal,what exercise does this cable curl image look like,Cable Bicep Curl,Generic coaching advice for,0.0,2,1,0.0
+cross_003,cross_modal,text_only_retrieval,cross_modal,what exercise does this cable curl image look like,Cable Bicep Curl,Cable Bicep Curl|Cable Row|Cable Fly,1.0,5,3,31.62
+cross_003,cross_modal,full_multimodal_agent,cross_modal,what exercise does this cable curl image look like,Cable Bicep Curl,Cable Bicep Curl|Cable Row|Cable Fly,1.0,5,5,341.61
+analytical_001,analytical,plain_llm_baseline,analytical,analyze my strongest lower body baseline lifts,Leg Press|Hip Thrust|Hack Squat|Back Squat,Generic coaching advice for,0.0,2,1,0.0
+analytical_001,analytical,text_only_retrieval,analytical,analyze my strongest lower body baseline lifts,Leg Press|Hip Thrust|Hack Squat|Back Squat,Hack Squat|Leg Press|Hip Thrust,1.0,5,3,39.9
+analytical_001,analytical,full_multimodal_agent,analytical,analyze my strongest lower body baseline lifts,Leg Press|Hip Thrust|Hack Squat|Back Squat,Romanian Deadlift|Back Squat|Hack Squat,0.6667,4,5,56.54
+analytical_002,analytical,plain_llm_baseline,analytical,compare my press strength baselines,Barbell Bench Press|Dumbbell Flat Bench Press|Dumbbell Shoulder Press,Generic coaching advice for,0.0,2,1,0.0
+analytical_002,analytical,text_only_retrieval,analytical,compare my press strength baselines,Barbell Bench Press|Dumbbell Flat Bench Press|Dumbbell Shoulder Press,Barbell Bench Press|Dumbbell Flat Bench Press|Leg Press,0.6667,4,3,32.69
+analytical_002,analytical,full_multimodal_agent,analytical,compare my press strength baselines,Barbell Bench Press|Dumbbell Flat Bench Press|Dumbbell Shoulder Press,Leg Press|Barbell Bench Press|Dumbbell Flat Bench Press,0.6667,4,5,45.57
+personal_001,personalized_followup,plain_llm_baseline,personalized_followup,recommend a knee friendly quad exercise for me,Hack Squat|Leg Press|Leg Extension,Generic coaching advice for,0.0,2,1,0.0
+personal_001,personalized_followup,text_only_retrieval,personalized_followup,recommend a knee friendly quad exercise for me,Hack Squat|Leg Press|Leg Extension,Hack Squat|Back Squat|Leg Extension,0.6667,4,3,29.4
+personal_001,personalized_followup,full_multimodal_agent,personalized_followup,recommend a knee friendly quad exercise for me,Hack Squat|Leg Press|Leg Extension,Hack Squat|Back Squat|Leg Extension,0.6667,4,5,46.61
+personal_002,personalized_followup,plain_llm_baseline,personalized_followup,"given my bodyweight pull up baseline, what back movement should I focus on",Pull Ups|Lat Pulldown|Seated Cable Row,Generic coaching advice for,0.0,2,1,0.0
+personal_002,personalized_followup,text_only_retrieval,personalized_followup,"given my bodyweight pull up baseline, what back movement should I focus on",Pull Ups|Lat Pulldown|Seated Cable Row,Back Squat|Pull Ups|Dumbbell Incline Bench Press,0.3333,3,3,29.27
+personal_002,personalized_followup,full_multimodal_agent,personalized_followup,"given my bodyweight pull up baseline, what back movement should I focus on",Pull Ups|Lat Pulldown|Seated Cable Row,Pull Ups|Dumbbell Shoulder Press|Seated Cable Row,0.6667,4,5,44.32
+personal_003,personalized_followup,plain_llm_baseline,personalized_followup,what glute exercise fits my current strength profile,Hip Thrust|Romanian Deadlift|Leg Press,Generic coaching advice for,0.0,2,1,0.0
+personal_003,personalized_followup,text_only_retrieval,personalized_followup,what glute exercise fits my current strength profile,Hip Thrust|Romanian Deadlift|Leg Press,Back Squat|Back Squat|Hack Squat,0.0,2,3,28.43
+personal_003,personalized_followup,full_multimodal_agent,personalized_followup,what glute exercise fits my current strength profile,Hip Thrust|Romanian Deadlift|Leg Press,Back Squat|Hack Squat|Leg Press,0.3333,3,5,46.86

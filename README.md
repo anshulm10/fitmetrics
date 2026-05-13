@@ -218,3 +218,229 @@ flowchart LR
   - Generated Chroma files under `data/chroma/` are ignored by git; the local DB is rebuilt from raw sources.
 - Next milestone:
   - Add reranking and modality fusion strategy (text + image + lift priors) for recommendation-time context assembly.
+
+## Report and Interview Notes
+
+### Embedding Models Currently Used
+
+The project currently has two embedding code paths, but both instantiate the same model choices.
+
+#### Active Phase 2 Embedding Pipeline
+
+This is the main multimodal indexing path used by:
+
+```bash
+uv run python src/embeddings/index_builder.py
+```
+
+Text embedding model:
+
+- Model: `sentence-transformers/all-MiniLM-L6-v2`
+- File: `src/embeddings/text_embedder.py`
+- Class: `TextEmbedder`
+- Initialization:
+
+```python
+DEFAULT_TEXT_MODEL = "sentence-transformers/all-MiniLM-L6-v2"
+
+class TextEmbedder:
+    def __init__(self, model_name: str = DEFAULT_TEXT_MODEL) -> None:
+        self.model_name = model_name
+        self.model = SentenceTransformer(model_name)
+```
+
+Image embedding model:
+
+- Model: `clip-ViT-B-32`
+- File: `src/embeddings/image_embedder.py`
+- Class: `ImageEmbedder`
+- Initialization:
+
+```python
+DEFAULT_IMAGE_MODEL = "clip-ViT-B-32"
+
+class ImageEmbedder:
+    def __init__(self, model_name: str = DEFAULT_IMAGE_MODEL) -> None:
+        self.model_name = model_name
+        self.model = SentenceTransformer(model_name)
+```
+
+#### Older `fit_support` Embedding Service
+
+There is also an older internal embedding service:
+
+- File: `src/fit_support/embeddings/embedder.py`
+- Class: `EmbeddingService`
+
+It initializes models from config:
+
+```python
+class EmbeddingService:
+    def __init__(self, settings: AppSettings) -> None:
+        self._text_model = SentenceTransformer(settings.text_embedding_model)
+        self._image_model = SentenceTransformer(settings.image_embedding_model)
+```
+
+The config defaults are:
+
+```python
+text_embedding_model = "sentence-transformers/all-MiniLM-L6-v2"
+image_embedding_model = "clip-ViT-B-32"
+```
+
+So both the new Phase 2 pipeline and the older service currently use:
+
+- Text: `sentence-transformers/all-MiniLM-L6-v2`
+- Image: `clip-ViT-B-32`
+
+### Why These Models Were Chosen
+
+- `all-MiniLM-L6-v2` is lightweight, fast locally, and strong enough for semantic search over exercise names, movement patterns, equipment, muscle groups, coaching cues, and lift-history notes.
+- `clip-ViT-B-32` is CLIP-compatible, so it can encode exercise images into vectors suitable for image similarity search.
+- Both models run locally through `sentence-transformers`, which keeps the system simple and avoids relying on paid hosted embedding APIs.
+
+### ChromaDB Collections
+
+The Phase 2 index builder creates and persists two Chroma collections in `data/chroma/`:
+
+- `fitness_text`: exercise metadata + lift history text embeddings.
+- `fitness_images`: exercise photo embeddings from nested image folders.
+
+Before each rebuild, `index_builder.py` resets the managed collections (`fitness_text`, `fitness_images`) and then verifies:
+
+- expected collection count
+- no duplicate IDs
+
+This prevents stale or incorrect vectors from previous runs.
+
+### Retrieval Functions
+
+The main retrieval functions are in `src/retrieval/search.py`:
+
+```python
+search_exercise_by_text(query: str)
+search_similar_exercise_image(image_path: str)
+```
+
+They return:
+
+- record ID
+- similarity score
+- document/source path
+- metadata such as exercise name, movement pattern, equipment, or image label
+
+### Interview Explanation
+
+This project separates ingestion, embedding, indexing, and retrieval into clear stages:
+
+1. Raw data is cleaned into structured CSVs.
+2. Exercise metadata and lift history are converted into natural-language text records.
+3. Exercise images are loaded recursively from nested folders.
+4. Text records are embedded with `all-MiniLM-L6-v2`.
+5. Image records are embedded with `clip-ViT-B-32`.
+6. Both modalities are stored in ChromaDB collections.
+7. Retrieval queries search the relevant collection and return explainable metadata.
+
+The key design decision is that Chroma stores vectors separately by modality (`fitness_text`, `fitness_images`) while preserving source metadata. This makes the system easy to debug, explain, and extend later with reranking or multimodal fusion.
+
+## Assessment Rubric Alignment
+
+### Research Question
+
+Can multimodal retrieval with personalized strength and injury memory outperform a text only baseline for personalized gym coaching?
+
+### Hypothesis
+
+Combining exercise images, structured workout history, and injury-aware routing will improve retrieval relevance and recommendation quality compared with text-only retrieval.
+
+### Agent Architecture
+
+The rubric-aligned agent adds a lightweight routing and tool layer on top of the embedding/retrieval system.
+
+```mermaid
+flowchart TD
+    userQuery[UserQuery] --> router[QueryRouter]
+    router --> factual[FactualRetrieval]
+    router --> crossModal[CrossModal]
+    router --> analytical[Analytical]
+    router --> personalized[PersonalizedFollowup]
+    factual --> textTool[TextRetrievalTool]
+    crossModal --> textTool
+    crossModal --> imageTool[ImageRetrievalTool]
+    analytical --> strengthTool[StrengthProgressionTool]
+    analytical --> textTool
+    personalized --> textTool
+    personalized --> injuryTool[InjuryMemoryTool]
+    personalized --> strengthTool
+    textTool --> chromaText[Chroma fitness_text]
+    imageTool --> chromaImages[Chroma fitness_images]
+    injuryTool --> injuryFiles[RawInjuryMemory]
+    strengthTool --> strengthCsv[StrengthCSV]
+```
+
+Query classes:
+
+- `factual_retrieval`: direct exercise metadata lookup.
+- `cross_modal`: image or visual similarity query.
+- `analytical`: comparison/progression/synthesis query.
+- `personalized_followup`: query needing injury, recovery, baseline, or user-specific context.
+
+Tools:
+
+- `TextRetrievalTool`: searches `fitness_text` in Chroma.
+- `ImageRetrievalTool`: searches `fitness_images` in Chroma.
+- `InjuryMemoryTool`: reads injury notes from `data/raw/injuries/`.
+- `StrengthProgressionTool`: reads `data/raw/lifts/strength.csv` and enriches matching with exercise-library muscle/movement context.
+
+### Evaluation Methodology
+
+Benchmark suite:
+
+- File: `tests/benchmark_queries.json`
+- Size: 11 queries.
+- Coverage:
+  - factual retrieval
+  - cross-modal retrieval
+  - analytical synthesis
+  - personalized follow-up
+
+Evaluation script:
+
+```bash
+uv run python src/evaluation/run_evaluation.py
+```
+
+Output:
+
+- `data/eval/results.csv`
+
+Compared systems:
+
+- **A. Plain LLM baseline**: deterministic no-retrieval baseline used as a lightweight proxy for generic answer behavior.
+- **B. Text-only retrieval**: searches only Chroma `fitness_text`.
+- **C. Full multimodal agent**: uses query routing plus text, image, injury memory, and strength progression tools.
+
+Metrics:
+
+- `Recall@3`: proportion of expected exercise names found in top 3 retrieved records.
+- `Response relevance (1–5)`: heuristic score derived from Recall@3.
+- `Personalization score (1–5)`: rewards use of strength, injury, and image evidence when appropriate.
+- `Latency`: measured per query/variant in milliseconds.
+
+Latest evaluation summary:
+
+| Variant | Recall@3 | Response relevance | Personalization score | Latency ms |
+|---|---:|---:|---:|---:|
+| Plain LLM baseline | 0.000 | 2.000 | 1.000 | 0.000 |
+| Text-only retrieval | 0.606 | 3.818 | 3.000 | 46.290 |
+| Full multimodal agent | 0.636 | 3.909 | 4.455 | 118.351 |
+
+### Ablation Experiments
+
+The evaluation is structured as an ablation:
+
+1. **No retrieval**: tests generic baseline behavior.
+2. **Text-only retrieval**: tests whether metadata/lift text improves exercise grounding.
+3. **Full multimodal agent**: tests whether adding query routing, image retrieval, injury memory, and strength progression improves personalized coaching.
+
+Current result: the full multimodal agent improves average `Recall@3`, response relevance, and personalization score compared with text-only retrieval, with higher latency due to extra tool calls.
