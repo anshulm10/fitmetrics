@@ -6,8 +6,9 @@ from typing import Any
 import pandas as pd
 from sentence_transformers import SentenceTransformer
 
+from config import cfg
 
-DEFAULT_TEXT_MODEL = "sentence-transformers/all-MiniLM-L6-v2"
+DEFAULT_TEXT_MODEL = cfg.embeddings.text_model
 
 
 def _slugify(name: str) -> str:

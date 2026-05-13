@@ -14,6 +14,7 @@ if str(SRC) not in sys.path:
     sys.path.insert(0, str(SRC))
 
 from agent.router import QueryRoute, QueryRouter
+from config import cfg
 from embeddings.image_embedder import ImageEmbedder
 from embeddings.text_embedder import TextEmbedder
 from retrieval.search import search_exercise_by_text, search_similar_exercise_image
@@ -36,13 +37,14 @@ class TextRetrievalTool:
     def __init__(self, embedder: TextEmbedder | None = None) -> None:
         self.embedder = embedder
 
-    def run(self, query: str, top_k: int = 3) -> ToolResult:
+    def run(self, query: str, top_k: int = cfg.retrieval.top_k) -> ToolResult:
+        """Run semantic text search and return a ToolResult."""
         return ToolResult(
             self.name,
             search_exercise_by_text(
                 query,
                 top_k=top_k,
-                chroma_path=ROOT / "data/chroma",
+                chroma_path=cfg.chroma.persist_path,
                 embedder=self.embedder,
             ),
         )
@@ -54,7 +56,8 @@ class ImageRetrievalTool:
     def __init__(self, embedder: ImageEmbedder | None = None) -> None:
         self.embedder = embedder
 
-    def run(self, image_path: str | None, top_k: int = 3) -> ToolResult:
+    def run(self, image_path: str | None, top_k: int = cfg.retrieval.top_k) -> ToolResult:
+        """Run CLIP image search and return a ToolResult."""
         if not image_path:
             return ToolResult(self.name, [])
         path = Path(image_path)
@@ -67,7 +70,7 @@ class ImageRetrievalTool:
             search_similar_exercise_image(
                 path,
                 top_k=top_k,
-                chroma_path=ROOT / "data/chroma",
+                chroma_path=cfg.chroma.persist_path,
                 embedder=self.embedder,
             ),
         )
@@ -79,7 +82,8 @@ class InjuryMemoryTool:
     def __init__(self, injuries_dir: Path | None = None) -> None:
         self.injuries_dir = injuries_dir or ROOT / "data/raw/injuries"
 
-    def run(self, query: str, top_k: int = 3) -> ToolResult:
+    def run(self, query: str, top_k: int = cfg.retrieval.top_k) -> ToolResult:
+        """Load injury-memory records relevant to body-part terms in the query."""
         records: list[dict[str, Any]] = []
         terms = [t for t in ("knee", "shoulder", "back", "hip", "pain", "injury", "recovery") if t in query.lower()]
         if not terms:
@@ -142,7 +146,8 @@ class StrengthProgressionTool:
             )
         return context
 
-    def run(self, query: str, top_k: int = 3) -> ToolResult:
+    def run(self, query: str, top_k: int = cfg.retrieval.top_k) -> ToolResult:
+        """Retrieve strength-progression records relevant to the query."""
         if not self.strength_csv.is_file():
             return ToolResult(self.name, [])
         df = pd.read_csv(self.strength_csv)
@@ -195,7 +200,8 @@ class FitnessToolRouter:
         self.injury = InjuryMemoryTool()
         self.strength = StrengthProgressionTool()
 
-    def run(self, query: str, image_path: str | None = None, top_k: int = 3) -> dict[str, Any]:
+    def run(self, query: str, image_path: str | None = None, top_k: int = cfg.retrieval.top_k) -> dict[str, Any]:
+        """Route and execute the appropriate tools for the query."""
         routed = self.router.route(query, image_path=image_path)
         results: list[ToolResult] = []
 

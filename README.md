@@ -444,3 +444,57 @@ The evaluation is structured as an ablation:
 3. **Full multimodal agent**: tests whether adding query routing, image retrieval, injury memory, and strength progression improves personalized coaching.
 
 Current result: the full multimodal agent improves average `Recall@3`, response relevance, and personalization score compared with text-only retrieval, with higher latency due to extra tool calls.
+
+A fourth ablation condition (`ablation_no_injury`) runs the full multimodal agent but strips injury-context records from the retrieved set before scoring.  This isolates the contribution of the injury-aware retrieval path.
+
+---
+
+## Reproducibility
+
+### Python version
+
+Python **3.13** is required (see `.python-version`).
+
+### Install dependencies
+
+```bash
+pip install uv          # install uv if not present
+uv sync                 # create .venv and install all dependencies from uv.lock
+```
+
+> **Do not modify `uv.lock`.**  It is committed to the repository to guarantee
+> a byte-for-byte reproducible environment.  Running `uv sync` (not `uv install`)
+> uses the lock file.
+
+### Single run command
+
+```bash
+uv run python run_all.py
+```
+
+This single command executes the full pipeline in order:
+
+| Step | Action |
+|------|--------|
+| 1 | Load and validate `config/config.yaml` |
+| 2 | Run data-ingestion pipeline → writes `data/processed/*.csv` |
+| 3 | Rebuild ChromaDB vector index → writes `data/chroma/` |
+| 4 | Run evaluation suite (4 conditions) → writes `data/eval/results.csv` |
+| 5 | Print results summary table to stdout |
+
+### Expected outputs
+
+After a successful run you should see:
+
+- `data/processed/exercises_clean.csv`, `lifts_clean.csv`, `workouts_clean.csv`, `injuries_clean.csv`
+- `data/chroma/` — persistent ChromaDB collections (`fitness_text`, `fitness_images`)
+- `data/eval/results.csv` — 44 rows (11 queries × 4 conditions) with columns:
+  `system_name`, `query_type`, `recall_at_k`, `mrr`, `personalization_score`,
+  `relevance_score`, `latency_ms`, `tool_calls_count`
+- A summary table printed to stdout showing mean metrics per condition
+
+### Locking policy
+
+`uv.lock` is committed and **must not be modified manually**.  To add a new
+dependency, run `uv add <package>` which updates both `pyproject.toml` and
+`uv.lock` atomically.

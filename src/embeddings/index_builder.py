@@ -12,6 +12,7 @@ SRC = ROOT / "src"
 if str(SRC) not in sys.path:
     sys.path.insert(0, str(SRC))
 
+from config import cfg
 from embeddings.image_embedder import ImageEmbedder, build_image_records
 from embeddings.text_embedder import TextEmbedder, build_text_records
 from retrieval.search import search_exercise_by_text, search_similar_exercise_image
@@ -22,14 +23,15 @@ def _log(tag: str, msg: str) -> None:
 
 
 def _prepare_collections(client: chromadb.PersistentClient):
-    for collection_name in ("fitness_text", "fitness_images"):
+    """Drop and recreate both ChromaDB collections for a clean rebuild."""
+    for collection_name in (cfg.chroma.text_collection, cfg.chroma.image_collection):
         try:
             client.delete_collection(collection_name)
             _log("INDEX", f"reset stale collection={collection_name}")
         except Exception:
             pass
-    text_col = client.get_or_create_collection("fitness_text")
-    image_col = client.get_or_create_collection("fitness_images")
+    text_col = client.get_or_create_collection(cfg.chroma.text_collection)
+    image_col = client.get_or_create_collection(cfg.chroma.image_collection)
     return text_col, image_col
 
 
@@ -69,16 +71,16 @@ def build_indexes() -> dict[str, int]:
     metadata_csv = ROOT / "data" / "raw" / "metadata" / "exercise_library.csv"
     lifts_dir = ROOT / "data" / "raw" / "lifts"
     images_root = ROOT / "data" / "raw" / "images"
-    chroma_dir = ROOT / "data" / "chroma"
+    chroma_dir = cfg.chroma.persist_path
     chroma_dir.mkdir(parents=True, exist_ok=True)
 
-    _log("EMBED TEXT", f"model=all-MiniLM-L6-v2 source={metadata_csv}")
+    _log("EMBED TEXT", f"model={cfg.embeddings.text_model} source={metadata_csv}")
     text_records = build_text_records(metadata_csv=metadata_csv, lifts_dir=lifts_dir)
     text_embedder = TextEmbedder()
     text_embeddings = text_embedder.embed_texts([r["text"] for r in text_records])
     _log("EMBED TEXT", f"records={len(text_records)} vectors={len(text_embeddings)}")
 
-    _log("EMBED IMAGE", f"model=clip-ViT-B-32 source={images_root}")
+    _log("EMBED IMAGE", f"model={cfg.embeddings.image_model} source={images_root}")
     image_records = build_image_records(images_root=images_root, metadata_csv=metadata_csv)
     image_embedder = ImageEmbedder()
     image_embeddings = image_embedder.embed_images([Path(r["image_path"]) for r in image_records])
@@ -89,9 +91,9 @@ def build_indexes() -> dict[str, int]:
     text_col, image_col = _prepare_collections(client)
     text_count = _upsert_records(text_col, text_records, text_embeddings, include_documents=True)
     image_count = _upsert_records(image_col, image_records, image_embeddings, include_documents=False)
-    _log("INDEX", f"fitness_text={text_count} fitness_images={image_count}")
-    _verify_collection(text_col, text_count, "fitness_text")
-    _verify_collection(image_col, image_count, "fitness_images")
+    _log("INDEX", f"{cfg.chroma.text_collection}={text_count} {cfg.chroma.image_collection}={image_count}")
+    _verify_collection(text_col, text_count, cfg.chroma.text_collection)
+    _verify_collection(image_col, image_count, cfg.chroma.image_collection)
 
     _log("SEARCH", "text query: knee friendly quad exercise")
     rows_1 = search_exercise_by_text(

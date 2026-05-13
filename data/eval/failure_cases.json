@@ -1,0 +1,236 @@
+[
+  {
+    "query": "machine quad isolation exercise",
+    "system": "ablation_no_injury",
+    "query_id": "factual_003",
+    "category": "factual_retrieval",
+    "retrieved_context": [
+      "Ab Crunch Machine",
+      "Machine Row",
+      "Rear Delt Fly Machine"
+    ],
+    "response": "[auto] retrieved: Ab Crunch Machine; Machine Row; Rear Delt Fly Machine",
+    "scores": {
+      "recall_at_k": 0.0,
+      "mrr": 0.0,
+      "relevance_score": 2,
+      "personalization_score": 3,
+      "latency_ms": 5006.97
+    },
+    "failure_reason": "UNLABELLED"
+  },
+  {
+    "query": "what glute exercise fits my current strength profile",
+    "system": "ablation_no_injury",
+    "query_id": "personal_003",
+    "category": "personalized_followup",
+    "retrieved_context": [
+      "Back Squat",
+      "Hack Squat",
+      "Leg Press"
+    ],
+    "response": "[auto] retrieved: Back Squat; Hack Squat; Leg Press",
+    "scores": {
+      "recall_at_k": 0.3333,
+      "mrr": 0.3333,
+      "relevance_score": 3,
+      "personalization_score": 5,
+      "latency_ms": 4990.81
+    },
+    "failure_reason": "UNLABELLED"
+  },
+  {
+    "query": "upper chest press",
+    "system": "ablation_no_injury",
+    "query_id": "factual_001",
+    "category": "factual_retrieval",
+    "retrieved_context": [
+      "Chest Press Machine",
+      "Incline Chest Press Machine",
+      "Military Press"
+    ],
+    "response": "[auto] retrieved: Chest Press Machine; Incline Chest Press Machine; Military Press",
+    "scores": {
+      "recall_at_k": 0.3333,
+      "mrr": 0.5,
+      "relevance_score": 3,
+      "personalization_score": 3,
+      "latency_ms": 4901.76
+    },
+    "failure_reason": "UNLABELLED"
+  },
+  {
+    "query": "machine quad isolation exercise",
+    "system": "full_multimodal_agent",
+    "query_id": "factual_003",
+    "category": "factual_retrieval",
+    "retrieved_context": [
+      "Ab Crunch Machine",
+      "Machine Row",
+      "Rear Delt Fly Machine"
+    ],
+    "response": "[auto] retrieved: Ab Crunch Machine; Machine Row; Rear Delt Fly Machine",
+    "scores": {
+      "recall_at_k": 0.0,
+      "mrr": 0.0,
+      "relevance_score": 2,
+      "personalization_score": 3,
+      "latency_ms": 5002.68
+    },
+    "failure_reason": "UNLABELLED"
+  },
+  {
+    "query": "what glute exercise fits my current strength profile",
+    "system": "full_multimodal_agent",
+    "query_id": "personal_003",
+    "category": "personalized_followup",
+    "retrieved_context": [
+      "Back Squat",
+      "Hack Squat",
+      "Leg Press"
+    ],
+    "response": "[auto] retrieved: Back Squat; Hack Squat; Leg Press",
+    "scores": {
+      "recall_at_k": 0.3333,
+      "mrr": 0.3333,
+      "relevance_score": 3,
+      "personalization_score": 5,
+      "latency_ms": 4949.28
+    },
+    "failure_reason": "UNLABELLED"
+  },
+  {
+    "query": "upper chest press",
+    "system": "full_multimodal_agent",
+    "query_id": "factual_001",
+    "category": "factual_retrieval",
+    "retrieved_context": [
+      "Chest Press Machine",
+      "Incline Chest Press Machine",
+      "Military Press"
+    ],
+    "response": "[auto] retrieved: Chest Press Machine; Incline Chest Press Machine; Military Press",
+    "scores": {
+      "recall_at_k": 0.3333,
+      "mrr": 0.5,
+      "relevance_score": 3,
+      "personalization_score": 3,
+      "latency_ms": 5256.31
+    },
+    "failure_reason": "UNLABELLED"
+  },
+  {
+    "query": "upper chest press",
+    "system": "plain_llm_baseline",
+    "query_id": "factual_001",
+    "category": "factual_retrieval",
+    "retrieved_context": [
+      "Generic coaching advice for"
+    ],
+    "response": "[auto] retrieved: Generic coaching advice for",
+    "scores": {
+      "recall_at_k": 0.0,
+      "mrr": 0.0,
+      "relevance_score": 2,
+      "personalization_score": 1,
+      "latency_ms": 0.0
+    },
+    "failure_reason": "UNLABELLED"
+  },
+  {
+    "query": "lat focused back movement",
+    "system": "plain_llm_baseline",
+    "query_id": "factual_002",
+    "category": "factual_retrieval",
+    "retrieved_context": [
+      "Generic coaching advice for"
+    ],
+    "response": "[auto] retrieved: Generic coaching advice for",
+    "scores": {
+      "recall_at_k": 0.0,
+      "mrr": 0.0,
+      "relevance_score": 2,
+      "personalization_score": 1,
+      "latency_ms": 0.0
+    },
+    "failure_reason": "UNLABELLED"
+  },
+  {
+    "query": "machine quad isolation exercise",
+    "system": "plain_llm_baseline",
+    "query_id": "factual_003",
+    "category": "factual_retrieval",
+    "retrieved_context": [
+      "Generic coaching advice for"
+    ],
+    "response": "[auto] retrieved: Generic coaching advice for",
+    "scores": {
+      "recall_at_k": 0.0,
+      "mrr": 0.0,
+      "relevance_score": 2,
+      "personalization_score": 1,
+      "latency_ms": 0.0
+    },
+    "failure_reason": "UNLABELLED"
+  },
+  {
+    "query": "machine quad isolation exercise",
+    "system": "text_only_retrieval",
+    "query_id": "factual_003",
+    "category": "factual_retrieval",
+    "retrieved_context": [
+      "Ab Crunch Machine",
+      "Machine Row",
+      "Rear Delt Fly Machine"
+    ],
+    "response": "[auto] retrieved: Ab Crunch Machine; Machine Row; Rear Delt Fly Machine",
+    "scores": {
+      "recall_at_k": 0.0,
+      "mrr": 0.0,
+      "relevance_score": 2,
+      "personalization_score": 3,
+      "latency_ms": 32.17
+    },
+    "failure_reason": "UNLABELLED"
+  },
+  {
+    "query": "what glute exercise fits my current strength profile",
+    "system": "text_only_retrieval",
+    "query_id": "personal_003",
+    "category": "personalized_followup",
+    "retrieved_context": [
+      "Back Squat",
+      "Back Squat",
+      "Hack Squat"
+    ],
+    "response": "[auto] retrieved: Back Squat; Back Squat; Hack Squat",
+    "scores": {
+      "recall_at_k": 0.0,
+      "mrr": 0.0,
+      "relevance_score": 2,
+      "personalization_score": 3,
+      "latency_ms": 23.27
+    },
+    "failure_reason": "UNLABELLED"
+  },
+  {
+    "query": "upper chest press",
+    "system": "text_only_retrieval",
+    "query_id": "factual_001",
+    "category": "factual_retrieval",
+    "retrieved_context": [
+      "Chest Press Machine",
+      "Incline Chest Press Machine",
+      "Military Press"
+    ],
+    "response": "[auto] retrieved: Chest Press Machine; Incline Chest Press Machine; Military Press",
+    "scores": {
+      "recall_at_k": 0.3333,
+      "mrr": 0.5,
+      "relevance_score": 3,
+      "personalization_score": 3,
+      "latency_ms": 186.86
+    },
+    "failure_reason": "UNLABELLED"
+  }
+]

@@ -1,0 +1,22 @@
+embeddings:
+  text_model: sentence-transformers/all-MiniLM-L6-v2
+  image_model: clip-ViT-B-32
+
+retrieval:
+  top_k: 3
+  recall_k: 3
+
+chroma:
+  text_collection: fitness_text
+  image_collection: fitness_images
+  persist_directory: data/chroma
+
+llm:
+  primary_model: llama3.1:8b
+  secondary_model: qwen2.5:7b
+  ollama_base_url: http://localhost:11434
+
+evaluation:
+  random_seed: 42
+  results_path: data/eval/results.csv
+  rejected_rows_path: data/eval/rejected_rows.csv
