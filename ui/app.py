@@ -1,5 +1,5 @@
 """
-FitSupport — Personal Fitness Agent  (Streamlit UI)
+FitSupport — Personal Training Assistant  (Streamlit UI)
 
 Run with:
     uv run streamlit run ui/app.py
@@ -7,128 +7,286 @@ Run with:
 from __future__ import annotations
 
 import sys
+import tempfile
 import time
 from pathlib import Path
 
-# Resolve project root so imports work regardless of cwd.
 _UI_DIR = Path(__file__).resolve().parent
 _ROOT = _UI_DIR.parent
-_SRC = _ROOT / "src"
-if str(_SRC) not in sys.path:
-    sys.path.insert(0, str(_SRC))
+if str(_ROOT) not in sys.path:
+    sys.path.insert(0, str(_ROOT))
 
 import streamlit as st
 
-from agent.graph import check_ollama, run_graph_with_model
-from config import cfg
+from src.agent.graph import run_graph_with_model
+from src.config import cfg
 
 # ── Page config ────────────────────────────────────────────────────────────────
 
 st.set_page_config(
-    page_title="FitSupport — Personal Fitness Agent",
+    page_title="FitSupport",
     page_icon="🏋️",
-    layout="wide",
-    initial_sidebar_state="expanded",
+    layout="centered",
+    initial_sidebar_state="collapsed",
 )
 
-# ── Sidebar ────────────────────────────────────────────────────────────────────
+# ── CSS overrides ──────────────────────────────────────────────────────────────
 
-with st.sidebar:
-    st.title("⚙️ Settings")
-    st.divider()
+st.markdown(
+    """
+    <style>
+    /* ── Chrome ── */
+    #MainMenu, footer, header { visibility: hidden; }
+    [data-testid="collapsedControl"] { display: none !important; }
 
-    model = st.selectbox(
-        "Model",
-        options=[cfg.llm.primary_model, cfg.llm.secondary_model],
-        index=0,
-        help="Ollama model used for generation.",
+    /* ── Layout ── */
+    .block-container {
+        max-width: 720px;
+        padding-top: 2.5rem;
+        padding-bottom: 3rem;
+    }
+
+    /* ── File uploader ── */
+    [data-testid="stFileUploader"] {
+        background: #141414;
+        border: 1px dashed #2e2e2e;
+        border-radius: 10px;
+        padding: 6px 10px;
+    }
+    [data-testid="stFileUploaderDropzone"] { background: transparent !important; }
+
+    /* ── Text input ── */
+    .stTextInput > div > div > input {
+        background: #141414 !important;
+        border: 1px solid #2e2e2e !important;
+        border-radius: 8px !important;
+        color: #e0e0e0 !important;
+        font-size: 1rem !important;
+        padding: 0.6rem 0.85rem !important;
+    }
+    .stTextInput > div > div > input::placeholder { color: #555 !important; }
+    .stTextInput > div > div > input:focus {
+        border-color: #3b5bdb !important;
+        box-shadow: 0 0 0 2px rgba(59,91,219,0.18) !important;
+    }
+
+    /* ── Submit button ── */
+    div[data-testid="column"]:not(:last-child) .stButton > button {
+        background: #2563eb !important;
+        border: none !important;
+        border-radius: 8px !important;
+        color: #fff !important;
+        font-weight: 600 !important;
+        font-size: 0.95rem !important;
+        padding: 0.5rem 1.5rem !important;
+        width: 100% !important;
+        transition: background 0.15s ease;
+    }
+    div[data-testid="column"]:not(:last-child) .stButton > button:hover { background: #1d4ed8 !important; }
+    div[data-testid="column"]:not(:last-child) .stButton > button:active { background: #1e40af !important; }
+
+    /* ── Clear button ── */
+    div[data-testid="column"]:last-child .stButton > button {
+        background: transparent !important;
+        border: 1px solid #2e2e2e !important;
+        border-radius: 8px !important;
+        color: #555 !important;
+        font-size: 0.8rem !important;
+        padding: 0.25rem 0.75rem !important;
+        transition: all 0.15s ease;
+    }
+    div[data-testid="column"]:last-child .stButton > button:hover {
+        border-color: #555 !important;
+        color: #888 !important;
+    }
+
+    /* ── Chat messages ── */
+    [data-testid="stChatMessage"] {
+        background: transparent !important;
+        border: none !important;
+        padding: 0.25rem 0 !important;
+    }
+
+    /* ── Response card (border container) ── */
+    [data-testid="stVerticalBlockBorderWrapper"] {
+        background: #141414 !important;
+        border: 1px solid #242424 !important;
+        border-radius: 12px !important;
+        padding: 0.25rem 0.5rem !important;
+    }
+
+    /* ── Expander ── */
+    [data-testid="stExpander"] {
+        background: #111 !important;
+        border: 1px solid #1e1e1e !important;
+        border-radius: 8px !important;
+    }
+    [data-testid="stExpander"] summary { color: #555 !important; font-size: 0.8rem !important; }
+
+    /* ── Meta strip ── */
+    .meta-strip {
+        color: #484848;
+        font-size: 0.72rem;
+        margin-top: 0.45rem;
+        letter-spacing: 0.015em;
+        font-family: monospace;
+    }
+
+    /* ── Dividers ── */
+    hr { border-color: #1e1e1e !important; margin: 0.6rem 0 !important; }
+
+    /* ── Spinner ── */
+    [data-testid="stSpinner"] p { color: #555 !important; font-size: 0.85rem !important; }
+    </style>
+    """,
+    unsafe_allow_html=True,
+)
+
+# ── Session state initialisation ───────────────────────────────────────────────
+
+if "messages" not in st.session_state:
+    st.session_state.messages = []
+if "input_counter" not in st.session_state:
+    st.session_state.input_counter = 0
+# Persist the last uploaded image across turns so follow-up questions still
+# have image context even after the file uploader is cleared on rerun.
+if "last_image_bytes" not in st.session_state:
+    st.session_state.last_image_bytes = None
+if "last_image_suffix" not in st.session_state:
+    st.session_state.last_image_suffix = ".jpg"
+
+# ── Header row (title + clear button) ─────────────────────────────────────────
+
+header_col, clear_col = st.columns([6, 1])
+with header_col:
+    st.markdown("## FitSupport")
+    st.caption(
+        f"Jeff Nippard methodology · injury-aware · "
+        f"`{cfg.llm.primary_model}` · top-k {cfg.retrieval.top_k}"
     )
+with clear_col:
+    st.markdown("<div style='margin-top:0.6rem'></div>", unsafe_allow_html=True)
+    if st.button("Clear", key="clear_chat"):
+        st.session_state.messages = []
+        st.session_state.last_image_bytes = None
+        st.session_state.last_image_suffix = ".jpg"
+        st.session_state.input_counter += 1
+        st.rerun()
 
-    query_type_override = st.selectbox(
-        "Query type",
-        options=[
-            "auto-detect",
-            "factual_retrieval",
-            "cross_modal",
-            "analytical",
-            "personalized_followup",
-        ],
-        index=0,
-        help="Force a routing decision or let the router decide automatically.",
-    )
+st.markdown("<hr>", unsafe_allow_html=True)
 
-    top_k = st.slider(
-        "Top-k",
-        min_value=1,
-        max_value=5,
-        value=cfg.retrieval.top_k,
-        help="Number of documents retrieved per modality.",
-    )
+# ── Conversation history display ───────────────────────────────────────────────
 
-    show_context = st.toggle("Show retrieved context", value=True)
+for msg in st.session_state.messages:
+    with st.chat_message(msg["role"]):
+        st.markdown(msg["content"])
+        if msg.get("image_bytes"):
+            with st.expander("Uploaded image", expanded=False):
+                st.image(msg["image_bytes"], use_container_width=True)
+        if msg.get("retrieved_images"):
+            valid = [p for p in msg["retrieved_images"] if p and Path(p).is_file()]
+            if valid:
+                cols = st.columns(min(len(valid), 3))
+                for col, p in zip(cols, valid[:3]):
+                    with col:
+                        st.image(p, use_container_width=True)
+                        st.caption(Path(p).parent.name.replace("_", " ").title())
 
-    st.divider()
-    st.caption(f"Ollama endpoint: `{cfg.llm.ollama_base_url}`")
-    if check_ollama():
-        st.success("Ollama reachable", icon="✅")
-    else:
-        st.error("Ollama unreachable", icon="🔴")
+# ── Input area ─────────────────────────────────────────────────────────────────
 
-# ── Main area ──────────────────────────────────────────────────────────────────
+uploaded_file = st.file_uploader(
+    "Exercise image — optional (triggers image similarity search)",
+    type=["jpg", "jpeg", "png"],
+    label_visibility="visible",
+    key=f"uploader_{st.session_state.input_counter}",
+)
 
-st.title("FitSupport — Personal Fitness Agent")
-st.caption("Powered by LangGraph + Ollama — retrieval-augmented, injury-aware coaching.")
+if uploaded_file is not None:
+    st.image(uploaded_file, use_container_width=True)
 
 query = st.text_input(
-    "Ask your fitness coach…",
-    placeholder="e.g. What exercises can I do with a knee injury?",
+    "query",
+    placeholder="What should I load on leg press today?",
     label_visibility="collapsed",
+    key=f"query_{st.session_state.input_counter}",
 )
 
-submitted = st.button("Submit", type="primary", use_container_width=False)
+ask_col, _ = st.columns([5, 1])
+with ask_col:
+    submitted = st.button("Ask", type="primary")
+
+# ── Guard ──────────────────────────────────────────────────────────────────────
+
+if submitted and not query.strip():
+    st.warning("Enter a question before submitting.")
+
+# ── Run ────────────────────────────────────────────────────────────────────────
 
 if submitted and query.strip():
-    with st.spinner(f"Thinking with **{model}**…"):
-        start_ts = time.perf_counter()
-        state = run_graph_with_model(query.strip(), model=model, top_k=top_k)
-        latency_ms = (time.perf_counter() - start_ts) * 1000
+    # Resolve image: prefer freshly uploaded file, fall back to persisted bytes.
+    image_path: str | None = None
+    image_bytes_for_history: bytes | None = None
 
-    # ── Response box ───────────────────────────────────────────────────────────
-    with st.chat_message("assistant", avatar="🏋️"):
-        st.markdown(state["final_response"])
+    if uploaded_file is not None:
+        suffix = Path(uploaded_file.name).suffix or ".jpg"
+        img_bytes = uploaded_file.getvalue()
+        st.session_state.last_image_bytes = img_bytes
+        st.session_state.last_image_suffix = suffix
+        image_bytes_for_history = img_bytes
+        with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp:
+            tmp.write(img_bytes)
+            image_path = tmp.name
+    elif st.session_state.last_image_bytes is not None:
+        # Recreate temp file from stored bytes so image context persists.
+        suffix = st.session_state.last_image_suffix
+        with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp:
+            tmp.write(st.session_state.last_image_bytes)
+            image_path = tmp.name
 
-    # ── Metadata row ──────────────────────────────────────────────────────────
-    col_lat, col_model, col_tools = st.columns(3)
-    col_lat.metric("Latency", f"{latency_ms:.0f} ms")
-    col_model.metric("Model", model)
-    col_tools.metric("Tools fired", len(state["tool_calls_log"]))
+    # Build conversation history from the last 3 exchanges (6 messages).
+    recent = st.session_state.messages[-6:]
+    conv_history = [{"role": m["role"], "content": m["content"]} for m in recent]
 
-    # ── Tool call timeline ─────────────────────────────────────────────────────
-    if state["tool_calls_log"]:
-        st.caption("**Execution path:** " + " → ".join(state["tool_calls_log"]))
+    # Append user message to history immediately so it shows on rerun.
+    st.session_state.messages.append({
+        "role": "user",
+        "content": query.strip(),
+        "image_bytes": image_bytes_for_history,
+    })
 
-    # ── Retrieved context expander ─────────────────────────────────────────────
-    if show_context:
-        context_sections: list[tuple[str, list[str]]] = [
-            ("Exercise documents", state.get("retrieved_text_context", [])),
-            ("Injury context", state.get("injury_context", [])),
-            ("Progression data", state.get("progression_context", [])),
-            ("Image context", state.get("retrieved_image_context", [])),
-        ]
-        any_context = any(items for _, items in context_sections)
+    with st.spinner("Thinking…"):
+        t0 = time.perf_counter()
+        state = run_graph_with_model(
+            query.strip(),
+            model=cfg.llm.primary_model,
+            top_k=cfg.retrieval.top_k,
+            image_path=image_path,
+            conversation_history=conv_history,
+        )
+        latency_ms = (time.perf_counter() - t0) * 1000
 
-        with st.expander("Retrieved context", expanded=False):
-            if not any_context:
-                st.info("No context was retrieved for this query.")
-            else:
-                for label, items in context_sections:
-                    if items:
-                        st.markdown(f"**{label}**")
-                        for i, doc in enumerate(items, 1):
-                            # Truncate very long docs so the UI stays readable.
-                            preview = doc[:400] + ("…" if len(doc) > 400 else "")
-                            st.markdown(f"{i}. {preview}")
-                        st.divider()
+    # Collect exercise demo images returned by the graph.
+    image_paths = state.get("retrieved_image_context", []) or []
+    valid_paths = [p for p in image_paths if p and Path(p).is_file()]
 
-elif submitted and not query.strip():
-    st.warning("Please enter a query before submitting.")
+    # Build meta string for assistant message.
+    tools_str = " → ".join(state["tool_calls_log"]) if state["tool_calls_log"] else "—"
+    meta = f'<p class="meta-strip">{latency_ms:.0f} ms &nbsp;·&nbsp; {tools_str}</p>'
+
+    # Append assistant message.
+    st.session_state.messages.append({
+        "role": "assistant",
+        "content": state["final_response"],
+        "retrieved_images": valid_paths,
+        "meta": meta,
+        "state": {
+            "retrieved_text_context": state.get("retrieved_text_context", []),
+            "injury_context": state.get("injury_context", []),
+            "progression_context": state.get("progression_context", []),
+            "retrieved_image_context": state.get("retrieved_image_context", []),
+        },
+    })
+
+    # Increment counter to clear the text input and file uploader on rerun.
+    st.session_state.input_counter += 1
+    st.rerun()

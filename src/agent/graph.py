@@ -26,39 +26,51 @@ from typing import Any
 from langgraph.graph import END, StateGraph
 
 ROOT = Path(__file__).resolve().parents[2]
-SRC = ROOT / "src"
-if str(SRC) not in sys.path:
-    sys.path.insert(0, str(SRC))
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
 
-from agent.router import QueryRoute, QueryRouter
-from agent.state import AgentState
-from agent.tools import InjuryMemoryTool, StrengthProgressionTool
-from config import cfg, user_profile
-from retrieval.search import search_exercise_by_text, search_similar_exercise_image
+from src.agent.router import QueryRoute, QueryRouter
+from src.agent.state import AgentState
+from src.agent.tools import InjuryMemoryTool, StrengthProgressionTool
+from src.config import cfg, user_profile
+from src.retrieval.search import (
+    _client as _chroma_client,
+    get_images_by_exercise_label,
+    search_exercise_by_text,
+    search_lift_records_by_text,
+    search_similar_exercise_image,
+)
 
 _CHROMA_PATH = cfg.chroma.persist_path
 
+# Pre-warm the ChromaDB client at import time so the SharedSystemClient
+# global registry is populated *before* LangGraph forks parallel nodes that
+# all want to read from the same persistent DB.  Without this, the parallel
+# fan-out (text_retrieval + progression_analysis + injury_lookup) races on
+# `chromadb._identifier_to_system` and one of the threads dies with
+# `Could not connect to tenant default_tenant`.
+_chroma_client(_CHROMA_PATH)
+
 # ── LLM prompts ────────────────────────────────────────────────────────────────
 
-_COACHING_PHILOSOPHY = (
-    "This user follows Jeff Nippard training methodology. "
-    "For every exercise recommendation, apply these principles:\n"
-    "- Prioritise the stretch position at the bottom of the movement\n"
-    "- Always cue controlled negatives (eccentric phase)\n"
-    "- Full ROM where injury permits\n"
-    "- Never give generic beginner cues — this is an experienced lifter\n\n"
-    "Injury context must always override exercise recommendations."
-)
-
 _SYSTEM_PROMPT = (
-    "You are my personal fitness coach with access to the user's workout "
-    "history, injury context, and exercise library. Always:\n"
-    "- Reference specific exercises from the retrieved context\n"
-    "- Respect injury limitations explicitly\n"
-    "- Reference the user's actual progression data when available\n"
-    "- Never recommend exercises that conflict with injury flags\n"
-    "- Be specific, not generic\n\n"
-    + _COACHING_PHILOSOPHY
+    "You are the user's personal training partner who knows their full history. "
+    "Be direct and conversational — like a coach texting a friend, not writing a report.\n\n"
+    "Rules:\n"
+    "- Maximum 3-4 sentences per response\n"
+    "- Never use bullet points or numbered lists\n"
+    "- Lead with the actual recommendation immediately\n"
+    "- Reference their real numbers casually e.g. 'you hit 140kg last time so try 142.5kg today'\n"
+    "- If injury is relevant, weave it in naturally e.g. 'given your knee, maybe drop to 130kg "
+    "and focus on the stretch'\n"
+    "- Never say 'No injury conflicts were found'\n"
+    "- Never say 'based on retrieved information'\n"
+    "- Never end with generic disclaimers\n"
+    "- Sound like you actually know them\n\n"
+    "Example of BAD response: 'Weight: 140-145kg. Sets: 4. Reps: 6-7. No injury conflicts found.'\n"
+    "Example of GOOD response: 'You hit 140kg x 6 last session so try 142.5kg today for 4 sets. "
+    "Keep it to parallel depth given the knee — full depth hack squats with that load will "
+    "aggravate it. Control the negative hard.'"
 )
 
 # ── Runtime overrides ──────────────────────────────────────────────────────────
@@ -179,16 +191,34 @@ def _build_user_prompt(state: AgentState) -> str:
     """Assemble the user-turn prompt from all accumulated context fields in state."""
 
     def _fmt(items: list[str]) -> str:
-        return "\n".join(items) if items else "None"
+        return "\n".join(f"- {item}" for item in items) if items else "None"
 
-    return (
+    parts: list[str] = []
+
+    history = state.get("conversation_history") or []
+    if history:
+        history_lines = "\n".join(
+            f"{msg['role'].capitalize()}: {msg['content']}" for msg in history
+        )
+        parts.append(
+            f"Previous messages:\n{history_lines}\n"
+            "Use this context for follow-up questions."
+        )
+
+    parts.append(
         f"Query: {state['query']}\n\n"
-        f"Retrieved exercises: {_fmt(state.get('retrieved_text_context', []))}\n"
-        f"Injury context: {_fmt(state.get('injury_context', []))}\n"
-        f"Progression data: {_fmt(state.get('progression_context', []))}\n"
-        f"Image context: {_fmt(state.get('retrieved_image_context', []))}\n\n"
+        f"Retrieved exercises:\n{_fmt(state.get('retrieved_text_context', []))}\n\n"
+        f"User's personal bests for relevant exercises:\n"
+        f"{_fmt(state.get('progression_context', []))}\n\n"
+        f"Use these exact numbers when recommending weight. "
+        f"If bench press best is 35 kg × 6, recommend 35–37.5 kg. "
+        f"Always reference actual numbers, never say 'increase gradually'.\n\n"
+        f"Injury context:\n{_fmt(state.get('injury_context', []))}\n\n"
+        f"Image context:\n{_fmt(state.get('retrieved_image_context', []))}\n\n"
         "Provide a specific, personalized recommendation."
     )
+
+    return "\n\n".join(parts)
 
 
 # ── private helpers ────────────────────────────────────────────────────────────
@@ -214,14 +244,34 @@ def router_node(state: AgentState) -> dict:
 
 
 def text_retrieval_node(state: AgentState) -> dict:
-    """Retrieve top-k exercise documents via semantic text search against fitness_text."""
+    """Retrieve top-k exercise documents and the demo image(s) for the top hit.
+
+    After ranking text documents, we look up the top exercise's demo images
+    (start/mid/finish frames) by exact ``exercise_label`` match.  This lets
+    the UI render the matching exercise visually without requiring the user
+    to upload an image first.
+    """
     records = search_exercise_by_text(
         state["query"],
         top_k=_get_top_k(),
         chroma_path=_CHROMA_PATH,
     )
+
+    image_docs: list[str] = []
+    for rec in records:
+        exercise_name = str((rec.get("metadata") or {}).get("exercise_name", "")).strip()
+        if not exercise_name:
+            continue
+        image_records = get_images_by_exercise_label(
+            exercise_name, chroma_path=_CHROMA_PATH, limit=3
+        )
+        if image_records:
+            image_docs.extend(_extract_docs(image_records))
+            break
+
     return {
         "retrieved_text_context": _extract_docs(records),
+        "retrieved_image_context": image_docs,
         "tool_calls_log": ["text_retrieval"],
     }
 
@@ -255,10 +305,26 @@ def injury_lookup_node(state: AgentState) -> dict:
 
 
 def progression_analysis_node(state: AgentState) -> dict:
-    """Retrieve personal strength-progression records relevant to the query."""
-    result = StrengthProgressionTool().run(state["query"], top_k=_get_top_k())
+    """Retrieve personal strength-progression records via a ChromaDB metadata filter.
+
+    Filters ``fitness_text`` by ``record_type == "lift_record"`` so the search
+    runs over the user's personal strength corpus only — the generic exercise
+    library can never crowd out their actual numbers.
+
+    Falls back to the CSV-based ``StrengthProgressionTool`` if ChromaDB returns
+    nothing (e.g. before the index has been built).
+    """
+    records = search_lift_records_by_text(
+        state["query"],
+        top_k=_get_top_k(),
+        chroma_path=_CHROMA_PATH,
+    )
+    if not records:
+        result = StrengthProgressionTool().run(state["query"], top_k=_get_top_k())
+        records = result.records
+
     return {
-        "progression_context": _extract_docs(result.records),
+        "progression_context": _extract_docs(records),
         "tool_calls_log": ["progression_analysis"],
     }
 
@@ -306,7 +372,7 @@ def route_by_query_type(state: AgentState) -> list[str]:
     if qt == QueryRoute.ANALYTICAL:
         return ["text_retrieval", "injury_lookup", "progression_analysis"]
     if qt == QueryRoute.PERSONALIZED_FOLLOWUP:
-        return ["text_retrieval", "injury_lookup"]
+        return ["text_retrieval", "injury_lookup", "progression_analysis"]
     return ["text_retrieval"]
 
 
@@ -349,7 +415,11 @@ compiled_graph = build_graph()
 graph = compiled_graph  # alias for ergonomic imports: from src.agent.graph import graph
 
 
-def run_graph(query: str, image_path: str | None = None) -> AgentState:
+def run_graph(
+    query: str,
+    image_path: str | None = None,
+    conversation_history: list[dict] | None = None,
+) -> AgentState:
     """Run the compiled graph for a single query and return the final AgentState.
 
     Parameters
@@ -358,6 +428,9 @@ def run_graph(query: str, image_path: str | None = None) -> AgentState:
         User question.
     image_path : str | None
         Optional path to a query image for cross_modal queries.
+    conversation_history : list[dict] | None
+        Recent chat exchanges for follow-up context, e.g. the last 3 pairs of
+        {"role": "user"|"assistant", "content": "..."} dicts.
     """
     initial: AgentState = {
         "query": query,
@@ -369,6 +442,7 @@ def run_graph(query: str, image_path: str | None = None) -> AgentState:
         "progression_context": [],
         "tool_calls_log": [],
         "final_response": "",
+        "conversation_history": conversation_history or [],
     }
     return compiled_graph.invoke(initial)
 
@@ -378,6 +452,7 @@ def run_graph_with_model(
     model: str,
     image_path: str | None = None,
     top_k: int | None = None,
+    conversation_history: list[dict] | None = None,
 ) -> AgentState:
     """Run the graph with a specific LLM model (and optional top_k override).
 
@@ -396,11 +471,13 @@ def run_graph_with_model(
         Optional path to a query image.
     top_k : int | None
         Override retrieval depth; None keeps cfg.retrieval.top_k.
+    conversation_history : list[dict] | None
+        Recent chat exchanges for follow-up context.
     """
     set_active_model(model)
     set_top_k_override(top_k)
     try:
-        return run_graph(query, image_path=image_path)
+        return run_graph(query, image_path=image_path, conversation_history=conversation_history)
     finally:
         set_active_model(None)
         set_top_k_override(None)

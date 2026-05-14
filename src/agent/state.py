@@ -8,7 +8,7 @@ accumulated list.
 from __future__ import annotations
 
 import operator
-from typing import Annotated, List, Optional, TypedDict
+from typing import Annotated, Any, Dict, List, Optional, TypedDict
 
 
 class AgentState(TypedDict):
@@ -35,6 +35,9 @@ class AgentState(TypedDict):
         Name of every node/tool that fired, in execution order.
     final_response : str
         The generated answer produced by the generation node.
+    conversation_history : Optional[List[Dict[str, Any]]]
+        Last N chat exchanges passed in from the UI for follow-up context.
+        Each item is {"role": "user"|"assistant", "content": "..."}.
     """
 
     query: str
@@ -46,3 +49,4 @@ class AgentState(TypedDict):
     progression_context: Annotated[List[str], operator.add]
     tool_calls_log: Annotated[List[str], operator.add]
     final_response: str
+    conversation_history: Optional[List[Dict[str, Any]]]
