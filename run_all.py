@@ -20,9 +20,8 @@ import time
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent
-SRC = ROOT / "src"
-if str(SRC) not in sys.path:
-    sys.path.insert(0, str(SRC))
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
 
 
 def _section(title: str) -> None:
@@ -43,7 +42,7 @@ def main() -> None:
 
     # ── Step 1: Config ─────────────────────────────────────────────────────────
     _section("Step 1 / 7 — Load config")
-    from config import cfg
+    from src.config import cfg
     print(f"  text_model   : {cfg.embeddings.text_model}")
     print(f"  image_model  : {cfg.embeddings.image_model}")
     print(f"  top_k        : {cfg.retrieval.top_k}")
@@ -54,21 +53,21 @@ def main() -> None:
     # ── Step 2: Ingestion ──────────────────────────────────────────────────────
     _section("Step 2 / 7 — Data ingestion pipeline")
     t = time.perf_counter()
-    from ingestion.pipeline import run_data_ingestion_pipeline
+    from src.ingestion.pipeline import run_data_ingestion_pipeline
     stats = run_data_ingestion_pipeline(project_root=ROOT)
     print(f"  ingestion complete: {stats}  [{_elapsed(t)}]")
 
     # ── Step 3: Index rebuild ──────────────────────────────────────────────────
     _section("Step 3 / 7 — Rebuild ChromaDB vector index")
     t = time.perf_counter()
-    from embeddings.index_builder import build_indexes
+    from src.embeddings.index_builder import build_indexes
     index_stats = build_indexes()
     print(f"  index built: {index_stats}  [{_elapsed(t)}]")
 
     # ── Step 4: Ollama warmup ──────────────────────────────────────────────────
     _section("Step 4 / 7 — Warm up Ollama (load primary model into RAM)")
     t = time.perf_counter()
-    from agent.graph import call_ollama
+    from src.agent.graph import call_ollama
     _warmup = call_ollama(
         user_prompt="Say OK.",
         system_prompt="You are a fitness coach.",
@@ -80,7 +79,7 @@ def main() -> None:
     # ── Step 5: Evaluation (primary model) ────────────────────────────────────
     _section("Step 5 / 7 — Full evaluation suite (4 conditions, primary model)")
     t = time.perf_counter()
-    from evaluation.run_evaluation import run_evaluation
+    from src.evaluation.run_evaluation import run_evaluation
     df = run_evaluation()
     print(f"  evaluation complete: {len(df)} rows  [{_elapsed(t)}]")
 

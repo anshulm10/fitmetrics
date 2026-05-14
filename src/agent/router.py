@@ -28,7 +28,10 @@ class QueryRouter:
         "picture",
         "visual",
         "form",
+        "show",
         "looks like",
+        "what is this",
+        "how does this look",
         "similar",
         "snapshot",
     }

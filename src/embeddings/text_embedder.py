@@ -6,7 +6,7 @@ from typing import Any
 import pandas as pd
 from sentence_transformers import SentenceTransformer
 
-from config import cfg
+from src.config import cfg
 
 DEFAULT_TEXT_MODEL = cfg.embeddings.text_model
 
@@ -106,10 +106,10 @@ def build_text_records(metadata_csv: Path, lifts_dir: Path) -> list[dict[str, An
             )
             records.append(
                 {
-                    "id": f"text_lift_{_slugify(exercise_name)}_{i}",
+                    "id": f"text_lift_record_{_slugify(exercise_name)}_{i}",
                     "text": text,
                     "metadata": {
-                        "record_type": "lift_history",
+                        "record_type": "lift_record",
                         "exercise_name": exercise_name,
                         "best_weight_kg": best_weight,
                         "best_reps": best_reps,

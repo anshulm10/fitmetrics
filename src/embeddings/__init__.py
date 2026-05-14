@@ -1,5 +1,5 @@
-from embeddings.text_embedder import TextEmbedder, build_text_records
-from embeddings.image_embedder import ImageEmbedder, build_image_records
+from src.embeddings.text_embedder import TextEmbedder, build_text_records
+from src.embeddings.image_embedder import ImageEmbedder, build_image_records
 
 __all__ = [
     "TextEmbedder",

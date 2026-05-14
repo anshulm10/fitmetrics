@@ -19,6 +19,7 @@ if str(_ROOT) not in sys.path:
 import streamlit as st
 
 from src.agent.graph import run_graph_with_model
+from src.agent.router import QueryRoute, QueryRouter
 from src.config import cfg
 
 # ── Page config ────────────────────────────────────────────────────────────────
@@ -183,7 +184,7 @@ for msg in st.session_state.messages:
         if msg.get("image_bytes"):
             with st.expander("Uploaded image", expanded=False):
                 st.image(msg["image_bytes"], use_container_width=True)
-        if msg.get("retrieved_images"):
+        if msg.get("show_images") and msg.get("retrieved_images"):
             valid = [p for p in msg["retrieved_images"] if p and Path(p).is_file()]
             if valid:
                 cols = st.columns(min(len(valid), 3))
@@ -226,6 +227,7 @@ if submitted and query.strip():
     # Resolve image: prefer freshly uploaded file, fall back to persisted bytes.
     image_path: str | None = None
     image_bytes_for_history: bytes | None = None
+    is_visual_query = QueryRouter().route(query.strip()).route == QueryRoute.CROSS_MODAL
 
     if uploaded_file is not None:
         suffix = Path(uploaded_file.name).suffix or ".jpg"
@@ -236,7 +238,7 @@ if submitted and query.strip():
         with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp:
             tmp.write(img_bytes)
             image_path = tmp.name
-    elif st.session_state.last_image_bytes is not None:
+    elif is_visual_query and st.session_state.last_image_bytes is not None:
         # Recreate temp file from stored bytes so image context persists.
         suffix = st.session_state.last_image_suffix
         with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp:
@@ -246,6 +248,7 @@ if submitted and query.strip():
     # Build conversation history from the last 3 exchanges (6 messages).
     recent = st.session_state.messages[-6:]
     conv_history = [{"role": m["role"], "content": m["content"]} for m in recent]
+    print(f"[FitSupport] conversation_history={conv_history}", flush=True)
 
     # Append user message to history immediately so it shows on rerun.
     st.session_state.messages.append({
@@ -267,7 +270,8 @@ if submitted and query.strip():
 
     # Collect exercise demo images returned by the graph.
     image_paths = state.get("retrieved_image_context", []) or []
-    valid_paths = [p for p in image_paths if p and Path(p).is_file()]
+    show_images = bool(state.get("show_images", False))
+    valid_paths = [p for p in image_paths if p and Path(p).is_file()] if show_images else []
 
     # Build meta string for assistant message.
     tools_str = " → ".join(state["tool_calls_log"]) if state["tool_calls_log"] else "—"
@@ -278,12 +282,14 @@ if submitted and query.strip():
         "role": "assistant",
         "content": state["final_response"],
         "retrieved_images": valid_paths,
+        "show_images": show_images,
         "meta": meta,
         "state": {
             "retrieved_text_context": state.get("retrieved_text_context", []),
             "injury_context": state.get("injury_context", []),
             "progression_context": state.get("progression_context", []),
             "retrieved_image_context": state.get("retrieved_image_context", []),
+            "show_images": show_images,
         },
     })
 

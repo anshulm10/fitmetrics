@@ -7,7 +7,7 @@ import pandas as pd
 from PIL import Image
 from sentence_transformers import SentenceTransformer
 
-from config import cfg
+from src.config import cfg
 
 DEFAULT_IMAGE_MODEL = cfg.embeddings.image_model
 IMAGE_SUFFIXES = {".jpg", ".jpeg", ".png", ".webp"}

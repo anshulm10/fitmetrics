@@ -13,11 +13,11 @@ SRC = ROOT / "src"
 if str(SRC) not in sys.path:
     sys.path.insert(0, str(SRC))
 
-from agent.router import QueryRoute, QueryRouter
-from config import cfg
-from embeddings.image_embedder import ImageEmbedder
-from embeddings.text_embedder import TextEmbedder
-from retrieval.search import search_exercise_by_text, search_similar_exercise_image
+from src.agent.router import QueryRoute, QueryRouter
+from src.config import cfg
+from src.embeddings.image_embedder import ImageEmbedder
+from src.embeddings.text_embedder import TextEmbedder
+from src.retrieval.search import search_exercise_by_text, search_similar_exercise_image
 
 
 @dataclass

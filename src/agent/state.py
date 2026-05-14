@@ -27,6 +27,8 @@ class AgentState(TypedDict):
         Accumulated text documents from semantic search.
     retrieved_image_context : List[str]
         Accumulated image documents from CLIP search.
+    show_images : bool
+        Whether the UI should render image results for this turn.
     injury_context : List[str]
         Injury-memory records relevant to the query.
     progression_context : List[str]
@@ -45,6 +47,7 @@ class AgentState(TypedDict):
     image_path: Optional[str]
     retrieved_text_context: Annotated[List[str], operator.add]
     retrieved_image_context: Annotated[List[str], operator.add]
+    show_images: bool
     injury_context: Annotated[List[str], operator.add]
     progression_context: Annotated[List[str], operator.add]
     tool_calls_log: Annotated[List[str], operator.add]

@@ -13,11 +13,10 @@ from pathlib import Path
 import pytest
 
 ROOT = Path(__file__).resolve().parents[1]
-SRC = ROOT / "src"
-if str(SRC) not in sys.path:
-    sys.path.insert(0, str(SRC))
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
 
-from retrieval.search import _build_where_clause, search_exercise_by_text
+from src.retrieval.search import _build_where_clause, search_exercise_by_text
 
 CHROMA_PATH = ROOT / "data" / "chroma"
 

@@ -14,7 +14,7 @@ __all__ = ["run_data_ingestion_pipeline"]
 
 def __getattr__(name: str) -> Any:
     if name == "run_data_ingestion_pipeline":
-        from ingestion.pipeline import run_data_ingestion_pipeline
+        from src.ingestion.pipeline import run_data_ingestion_pipeline
 
         return run_data_ingestion_pipeline
     raise AttributeError(f"module {__name__!r} has no attribute {name!r}")

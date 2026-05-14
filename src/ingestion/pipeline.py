@@ -8,10 +8,10 @@ from typing import Any
 
 import pandas as pd
 
-from ingestion import preprocess
-from ingestion.loaders import load_csv_dir, load_json_dir, load_metadata_dir
-from ingestion.models import ExerciseMetadata, InjuryRecord, LiftRecord, WorkoutRecord
-from ingestion.validators import (
+from src.ingestion import preprocess
+from src.ingestion.loaders import load_csv_dir, load_json_dir, load_metadata_dir
+from src.ingestion.models import ExerciseMetadata, InjuryRecord, LiftRecord, WorkoutRecord
+from src.ingestion.validators import (
     validate_exercise_in_library,
     validate_exercise_metadata,
     validate_injury_record,

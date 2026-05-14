@@ -327,6 +327,7 @@ Module: `src/agent/graph.py`
 | `image_path` | `Optional[str]` | — |
 | `retrieved_text_context` | `List[str]` | ADD (append) |
 | `retrieved_image_context` | `List[str]` | ADD (append) |
+| `show_images` | `bool` | - |
 | `injury_context` | `List[str]` | ADD (append) |
 | `progression_context` | `List[str]` | ADD (append) |
 | `tool_calls_log` | `List[str]` | ADD (append) |
@@ -336,6 +337,11 @@ Module: `src/agent/graph.py`
 `conversation_history` carries the last N chat turns from the UI. It is set
 once in `run_graph()` and only read by `_build_user_prompt` — no node writes to
 it, so it deliberately has no ADD reducer.
+
+`show_images` defaults to `False` and is only set to `True` by
+`image_retrieval_node`. This gives the UI a clear rendering contract: normal
+weight, rep, injury, and non-visual follow-up turns can still retrieve text,
+injury, and progression evidence without displaying exercise images.
 
 ### Node execution path
 
@@ -354,8 +360,12 @@ START
   │
   generation_node      — builds prompt, calls Ollama
   │
-  END
+END
 ```
+
+Implementation note: `text_retrieval_node` no longer controls whether images
+are shown in the UI. The rendering decision is carried by `show_images`, and
+only `image_retrieval_node` sets that flag to `True`.
 
 ### Generation system prompt
 
@@ -374,20 +384,29 @@ good/bad response examples to anchor the model's output format.
 
 `_build_user_prompt(state)` produces the user turn in this order:
 
-1. **Previous messages** (if `conversation_history` is non-empty):
+1. **Previous conversation** (if `conversation_history` is non-empty):
    ```
-   Previous messages:
+   Previous conversation:
    User: <msg>
    Assistant: <msg>
    ...
-   Use this context for follow-up questions.
+
+   The user is now asking: <query>
+
+   This is a follow-up - do not repeat previous advice.
+   If you already recommended hack squat, don't recommend it again.
+   Answer the NEW question directly using the conversation context above.
    ```
 2. **Query**
 3. **Retrieved exercises** (text context)
 4. **User's personal bests** (progression context) with explicit directive to
    cite exact numbers
 5. **Injury context**
-6. **Image context**
+6. **Image context** only when `show_images=True`
+
+The explicit follow-up block prevents repeated responses by making the previous
+assistant advice visible to the model and instructing it to answer the new
+question directly rather than restating the same recommendation.
 
 ### Entry points
 
@@ -419,15 +438,18 @@ Entry point: `uv run streamlit run ui/app.py`
 - The last 6 messages (3 user + 3 assistant = 3 full exchanges) are passed to
   `run_graph_with_model` as `conversation_history`, enabling follow-up questions
   like *"ok what about today?"* without re-stating the exercise.
+- `ui/app.py` prints the exact `conversation_history` payload to the console
+  before invoking the graph, which makes repeated-response debugging visible
+  during Streamlit runs.
 
 #### Image persistence
 
 - When a user uploads an image, its bytes are stored in
   `st.session_state.last_image_bytes`.
-- On subsequent turns where no new image is uploaded, the stored bytes are
-  written to a fresh temp file and passed as `image_path` to the graph.
-- This means *"what weight should I use for that?"* two messages after an
-  image upload still resolves the image correctly.
+- On subsequent turns where no new image is uploaded, stored image bytes are
+  reused only when the new query has explicit visual intent.
+- This prevents an earlier uploaded image from forcing every later weight,
+  rep, injury, or follow-up question down the image route.
 
 #### Input auto-clear
 
@@ -444,9 +466,12 @@ Entry point: `uv run streamlit run ui/app.py`
 #### Retrieved image display
 
 - After each assistant response, exercise demo images returned by the graph are
-  rendered in a column layout.
+  rendered only when `show_images=True`.
 - Demo images are also stored in the message dict so they re-render when the
   conversation history is replayed on rerun.
+- `show_images=True` is produced only by `image_retrieval_node`, which runs for
+  user-uploaded images, `cross_modal` queries, or explicit visual wording such
+  as "show", "image", "photo", "what is this", and "how does this look".
 
 ### State flow per submission
 

@@ -33,14 +33,14 @@ SRC = ROOT / "src"
 if str(SRC) not in sys.path:
     sys.path.insert(0, str(SRC))
 
-from agent.graph import run_graph, run_graph_with_model
-from agent.router import QueryRouter
-from agent.tools import FitnessToolRouter
-from config import cfg
-from embeddings.image_embedder import ImageEmbedder
-from embeddings.index_builder import build_indexes
-from embeddings.text_embedder import TextEmbedder
-from retrieval.search import search_exercise_by_text
+from src.agent.graph import run_graph, run_graph_with_model
+from src.agent.router import QueryRouter
+from src.agent.tools import FitnessToolRouter
+from src.config import cfg
+from src.embeddings.image_embedder import ImageEmbedder
+from src.embeddings.index_builder import build_indexes
+from src.embeddings.text_embedder import TextEmbedder
+from src.retrieval.search import search_exercise_by_text
 
 
 # ── data helpers ───────────────────────────────────────────────────────────────

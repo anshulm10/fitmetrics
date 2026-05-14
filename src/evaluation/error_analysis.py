@@ -38,7 +38,7 @@ SRC = ROOT / "src"
 if str(SRC) not in sys.path:
     sys.path.insert(0, str(SRC))
 
-from config import cfg
+from src.config import cfg
 
 _FAILURE_CASES_PATH = ROOT / "data" / "eval" / "failure_cases.json"
 _VALID_FAILURE_REASONS = frozenset(

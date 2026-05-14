@@ -6,7 +6,7 @@ from typing import Any
 
 from pydantic import ValidationError
 
-from ingestion.models import ExerciseMetadata, InjuryRecord, LiftRecord, WorkoutRecord
+from src.ingestion.models import ExerciseMetadata, InjuryRecord, LiftRecord, WorkoutRecord
 
 
 def _validation_errors(exc: ValidationError) -> list[str]:

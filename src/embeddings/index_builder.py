@@ -12,10 +12,10 @@ SRC = ROOT / "src"
 if str(SRC) not in sys.path:
     sys.path.insert(0, str(SRC))
 
-from config import cfg
-from embeddings.image_embedder import ImageEmbedder, build_image_records
-from embeddings.text_embedder import TextEmbedder, build_text_records
-from retrieval.search import search_exercise_by_text, search_similar_exercise_image
+from src.config import cfg
+from src.embeddings.image_embedder import ImageEmbedder, build_image_records
+from src.embeddings.text_embedder import TextEmbedder, build_text_records
+from src.retrieval.search import search_exercise_by_text, search_similar_exercise_image
 
 
 def _log(tag: str, msg: str) -> None:

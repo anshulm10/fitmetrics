@@ -4,6 +4,7 @@ Local-first multimodal RAG fitness assistant for personalized exercise recommend
 
 ## Current milestone
 - M1 through M5 complete. User coaching philosophy injected into generation system prompt.
+- Follow-up chat handling now uses prior conversation explicitly, and exercise images are only displayed for image/visual-intent turns.
 
 ## Task checklist
 - [x] Define architecture-first folder structure and module placeholders.
@@ -34,6 +35,8 @@ Local-first multimodal RAG fitness assistant for personalized exercise recommend
 - Keep implementation local-first using filesystem + persistent Chroma database.
 - Store user coaching philosophy in `data/raw/user_profile.json`; load once at startup via `config.load_user_profile()` so all modules share a single cached read.
 - Inject Jeff Nippard methodology as a named `_COACHING_PHILOSOPHY` constant appended to `_SYSTEM_PROMPT`, keeping the coaching layer separate from the base agent instructions for easy iteration.
+- Gate image display through `AgentState.show_images`; only the `image_retrieval` node can enable it, so normal weight, rep, injury, and follow-up questions do not render demo images.
+- Pass the last six Streamlit messages into the generation prompt as explicit previous conversation context so follow-up answers address the new question instead of repeating prior advice.
 
 ---
 
@@ -62,6 +65,23 @@ Build a local-first multimodal RAG fitness assistant that ingests workout histor
 - Shared `ContextChunk` schema to keep ingestion and retrieval interfaces consistent.
 
 ## Implementation Log
+### Latest update - image gating and follow-up context
+- What was fixed:
+  - Assistant responses were showing retrieved exercise images on ordinary text turns because text retrieval also attached demo image paths.
+  - Second and third turns could repeat the same advice because the generation prompt did not make the prior conversation prominent enough.
+- Implementation:
+  - Added `show_images: bool` to `AgentState`, initialized to `False`.
+  - Set `show_images=True` only from `image_retrieval_node`.
+  - Updated `ui/app.py` to render retrieved images only when the assistant message has `show_images=True`.
+  - Added visual-intent routing terms such as `show`, `what is this`, and `how does this look`.
+  - Reused a persisted uploaded image only for explicit visual follow-up questions, not for every later turn.
+  - Updated the generation prompt to include `Previous conversation`, the current user query, and an instruction not to repeat previous advice.
+  - Added a console debug print of `conversation_history` before invoking the graph.
+- Verification:
+  - `python -m compileall ui/app.py src/agent/graph.py src/agent/state.py src/agent/router.py`
+  - `uv run` routing check confirmed ordinary load questions route to `factual_retrieval` and visual requests route to `cross_modal`.
+  - Prompt check confirmed conversation history is included and image context is suppressed when `show_images=False`.
+
 ### Day 1
 - What was built:
   - Architecture scaffold under `src/fit_support` (`config`, `domain`, `ingest`, `embeddings`, `retrieval`, `graph`, `eval`).

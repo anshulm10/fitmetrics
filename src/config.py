@@ -7,7 +7,7 @@ or numbers.
 
 Usage
 -----
-    from config import cfg, user_profile
+    from src.config import cfg, user_profile
 
     top_k     = cfg.retrieval.top_k
     seed      = cfg.evaluation.random_seed

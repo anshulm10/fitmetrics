@@ -201,10 +201,14 @@ def _build_user_prompt(state: AgentState) -> str:
             f"{msg['role'].capitalize()}: {msg['content']}" for msg in history
         )
         parts.append(
-            f"Previous messages:\n{history_lines}\n"
-            "Use this context for follow-up questions."
+            f"Previous conversation:\n{history_lines}\n\n"
+            f"The user is now asking: {state['query']}\n\n"
+            "This is a follow-up - do not repeat previous advice. "
+            "If you already recommended hack squat, don't recommend it again. "
+            "Answer the NEW question directly using the conversation context above."
         )
 
+    image_context = state.get("retrieved_image_context", []) if state.get("show_images") else []
     parts.append(
         f"Query: {state['query']}\n\n"
         f"Retrieved exercises:\n{_fmt(state.get('retrieved_text_context', []))}\n\n"
@@ -214,7 +218,7 @@ def _build_user_prompt(state: AgentState) -> str:
         f"If bench press best is 35 kg × 6, recommend 35–37.5 kg. "
         f"Always reference actual numbers, never say 'increase gradually'.\n\n"
         f"Injury context:\n{_fmt(state.get('injury_context', []))}\n\n"
-        f"Image context:\n{_fmt(state.get('retrieved_image_context', []))}\n\n"
+        f"Image context:\n{_fmt(image_context)}\n\n"
         "Provide a specific, personalized recommendation."
     )
 
@@ -280,17 +284,41 @@ def image_retrieval_node(state: AgentState) -> dict:
     """Retrieve similar exercise images via CLIP embedding search against fitness_images."""
     image_path = state.get("image_path")
     if not image_path:
-        return {"retrieved_image_context": [], "tool_calls_log": ["image_retrieval"]}
+        records = search_exercise_by_text(
+            state["query"],
+            top_k=1,
+            chroma_path=_CHROMA_PATH,
+        )
+        image_docs: list[str] = []
+        for rec in records:
+            exercise_name = str((rec.get("metadata") or {}).get("exercise_name", "")).strip()
+            if not exercise_name:
+                continue
+            image_records = get_images_by_exercise_label(
+                exercise_name, chroma_path=_CHROMA_PATH, limit=3
+            )
+            image_docs.extend(_extract_docs(image_records))
+            break
+        return {
+            "retrieved_image_context": image_docs,
+            "show_images": True,
+            "tool_calls_log": ["image_retrieval"],
+        }
     path = Path(image_path)
     if not path.is_absolute():
         path = ROOT / path
     if not path.is_file():
-        return {"retrieved_image_context": [], "tool_calls_log": ["image_retrieval"]}
+        return {
+            "retrieved_image_context": [],
+            "show_images": True,
+            "tool_calls_log": ["image_retrieval"],
+        }
     records = search_similar_exercise_image(
         path, top_k=_get_top_k(), chroma_path=_CHROMA_PATH
     )
     return {
         "retrieved_image_context": _extract_docs(records),
+        "show_images": True,
         "tool_calls_log": ["image_retrieval"],
     }
 
@@ -365,10 +393,10 @@ def route_by_query_type(state: AgentState) -> list[str]:
     same superstep.  Nodes share state via the ADD reducer.
     """
     qt = state["query_type"]
-    if qt == QueryRoute.FACTUAL_RETRIEVAL:
-        return ["text_retrieval"]
     if qt == QueryRoute.CROSS_MODAL:
         return ["image_retrieval"]
+    if qt == QueryRoute.FACTUAL_RETRIEVAL:
+        return ["text_retrieval"]
     if qt == QueryRoute.ANALYTICAL:
         return ["text_retrieval", "injury_lookup", "progression_analysis"]
     if qt == QueryRoute.PERSONALIZED_FOLLOWUP:
@@ -438,6 +466,7 @@ def run_graph(
         "image_path": image_path,
         "retrieved_text_context": [],
         "retrieved_image_context": [],
+        "show_images": False,
         "injury_context": [],
         "progression_context": [],
         "tool_calls_log": [],
