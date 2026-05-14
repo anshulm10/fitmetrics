@@ -374,9 +374,9 @@ for msg in st.session_state.messages:
 # ── Input area ─────────────────────────────────────────────────────────────────
 
 uploaded_file = st.file_uploader(
-    "Exercise image — optional (triggers image similarity search)",
+    "Upload exercise image",
     type=["jpg", "jpeg", "png"],
-    label_visibility="visible",
+    help="Upload a photo to identify the exercise",
     key=f"uploader_{st.session_state.input_counter}",
 )
 

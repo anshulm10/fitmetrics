@@ -47,7 +47,7 @@ Local-first multimodal RAG fitness assistant for personalized exercise recommend
 uv run python run_all.py
 
 # Streamlit UI
-uv run streamlit run ui/app.py
+uv run streamlit run ui/app.py --server.maxUploadSize 10
 
 # Evaluation only
 uv run python -m evaluation.run_evaluation

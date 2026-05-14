@@ -62,14 +62,18 @@ def _format_rows(raw: dict[str, Any], k: int) -> list[dict[str, Any]]:
         if i >= k:
             break
         metadata = dict(meta or {})
-        if "exercise_name" not in metadata and metadata.get("exercise_label"):
-            metadata["exercise_name"] = metadata["exercise_label"]
+        exercise_name = str(
+            metadata.get("exercise_name") or metadata.get("exercise_label") or ""
+        ).strip()
+        if exercise_name:
+            metadata["exercise_name"] = exercise_name
         rows.append(
             {
                 "id": rid,
                 "score": 1.0 - float(dist),
                 "document": doc,
                 "metadata": metadata,
+                "exercise_name": exercise_name,
             }
         )
     return rows
@@ -167,6 +171,7 @@ def search_lift_records_by_text(
     top_k: int = cfg.retrieval.top_k,
     chroma_path: str | Path = cfg.chroma.persist_directory,
     embedder: TextEmbedder | None = None,
+    exercise_name: str | None = None,
 ) -> list[dict[str, Any]]:
     """Retrieve only the user's personal lift-history records.
 
@@ -174,17 +179,39 @@ def search_lift_records_by_text(
     semantic search runs over the personal strength corpus *only*, never the
     generic exercise library.  This is the canonical entry point for the
     ``progression_analysis`` graph node.
+
+    Parameters
+    ----------
+    exercise_name : str | None
+        When set, adds an exact ``exercise_name == exercise_name`` filter so
+        the result contains only that exercise's lift history.  Used by the
+        image-identification flow to avoid cross-exercise weight contamination.
     """
-    logger.info("[search_lift_records_by_text] filter: record_type=lift_record")
     chroma_dir = Path(chroma_path)
     client = _client(chroma_dir)
     col = client.get_or_create_collection(cfg.chroma.text_collection)
     emb = embedder or TextEmbedder()
     q_vec = emb.embed_query(query)
+
+    if exercise_name:
+        logger.info(
+            "[search_lift_records_by_text] filter: record_type=lift_record, exercise_name=%r",
+            exercise_name,
+        )
+        where: dict = {
+            "$and": [
+                {"record_type": {"$eq": "lift_record"}},
+                {"exercise_name": {"$eq": exercise_name}},
+            ]
+        }
+    else:
+        logger.info("[search_lift_records_by_text] filter: record_type=lift_record")
+        where = {"record_type": {"$eq": "lift_record"}}
+
     raw = col.query(
         query_embeddings=[q_vec],
         n_results=top_k,
-        where={"record_type": "lift_record"},
+        where=where,
     )
     return _format_rows(raw, top_k)
 
@@ -223,14 +250,15 @@ def search_similar_exercise_image(
     chroma_path: str | Path = cfg.chroma.persist_directory,
     embedder: ImageEmbedder | None = None,
 ) -> list[dict[str, Any]]:
-    """Retrieve the best matching exercise image from the *fitness_images* collection.
+    """Retrieve the single best matching exercise image from *fitness_images*.
 
     Parameters
     ----------
     image_path : str | Path
         Path to the query image file.
     top_k : int
-        Ignored for image identification; this function returns only the best match.
+        Ignored for image identification; this function always returns only the
+        highest-scoring match so generation uses one explicit exercise name.
     chroma_path : str | Path
         Filesystem path to the persistent ChromaDB directory.
     embedder : ImageEmbedder | None

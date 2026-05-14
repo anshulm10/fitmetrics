@@ -98,14 +98,15 @@ _SYSTEM_PROMPT = (
     "use the exact greeting block above)\n"
     "- Never use bullet points or numbered lists (except inside the greeting block)\n"
     "- Lead with the actual recommendation immediately\n"
-    "- NEVER start your response with 'Given your recent performance' or any variation of it. "
-    "Never start with 'Given your...'. Vary your opening naturally. Examples: "
+    "- NEVER start your response with 'Given your recent performance' "
+    "or any variation of it. Never start with 'Given your...'. "
+    "Vary your opening naturally. Examples: "
     "'Your hack squat is at 140kg x 6 so...', "
     "'Based on where you're at with hack squat...', "
     "'You hit 140kg last session —', "
     "'For hack squat today,', "
     "'Looking at your progression,'. "
-    "Start mid thought like a coach would, not like a report. Try to give motivation.\n"
+    "Start mid-thought like a coach would, not like a report.\n"
     "- Reference their real numbers casually e.g. 'you hit 140kg last time so try 142.5kg today'\n"
     "- Never say 'No injury conflicts were found'\n"
     "- Never say 'based on retrieved information'\n"
@@ -153,11 +154,17 @@ _INJURY_KEYWORD_PATTERN = re.compile(
 
 
 def _is_greeting_query(query: str) -> bool:
-    """Return True if the query is a pure greeting or capability question."""
+    """Return True for pure greetings/capability questions only.
+
+    Allows simple combinations like "hey what can you do?", but rejects
+    queries that add a real task, e.g. "hey what is this exercise?".
+    """
     q = (query or "").strip()
     if not q:
         return False
     q_clean = re.sub(r"[!?.\s]+", " ", q.lower()).strip()
+    q_clean = re.sub(r"[,;:]+", " ", q_clean)
+    q_clean = re.sub(r"\s+", " ", q_clean).strip()
     greeting_terms = {
         "hi",
         "hello",
@@ -176,6 +183,11 @@ def _is_greeting_query(query: str) -> bool:
         return True
     if _CAPABILITY_PATTERN.fullmatch(q_clean):
         return True
+    greeting_prefixes = sorted(greeting_terms, key=len, reverse=True)
+    for greeting in greeting_prefixes:
+        if q_clean.startswith(f"{greeting} "):
+            remainder = q_clean[len(greeting) :].strip()
+            return bool(_CAPABILITY_PATTERN.fullmatch(remainder))
     return False
 
 
@@ -373,14 +385,25 @@ def _build_user_prompt(state: AgentState) -> str:
     def _fmt(items: list[str]) -> str:
         return "\n".join(f"- {item}" for item in items) if items else "None"
 
-    # Greetings bypass the retrieval template entirely — the LLM should only
-    # see the user's message and follow the GREETING rules in the system prompt.
-    if state.get("query_type") == "greeting":
+    # Greetings bypass the retrieval template ONLY when no image was uploaded.
+    # An uploaded image always takes priority — even with a simple greeting text.
+    if state.get("query_type") == "greeting" and not state.get("image_path"):
         return (
             f"The user said: {state['query']!r}\n\n"
             "Follow the GREETING / INTRODUCTION RULES in your system prompt. "
             "Introduce yourself as FitSupport using the exact example list. "
             "Do not invent workout numbers, weights, or retrieval results."
+        )
+
+    # If CLIP confidence was too low, short-circuit: just relay the note to the
+    # user.  Do not attempt any weight recommendation without a known exercise.
+    image_note = (state.get("image_identification_note") or "").strip()
+    if image_note:
+        return (
+            f"Query: {state['query']}\n\n"
+            f"Image identification result: {image_note}\n\n"
+            "Relay this message to the user exactly as written. "
+            "Do not guess an exercise name or suggest weights."
         )
 
     parts: list[str] = []
@@ -400,19 +423,30 @@ def _build_user_prompt(state: AgentState) -> str:
 
     image_context = state.get("retrieved_image_context", []) if state.get("show_images") else []
     matched_exercise_name = (state.get("matched_exercise_name") or "").strip()
+
     if matched_exercise_name:
         parts.append(
             "The uploaded image was matched to: "
             f"{matched_exercise_name} in the user's exercise library. "
-            "Use this exact name when responding — do not guess a different exercise. "
-            "If you need a short lead-in, use one line max: "
-            "'FitSupport — here's what I found:'"
+            "Use this exact name when responding — do not guess a different exercise."
         )
+
+    # Progression context — use targeted data when an exercise was image-identified.
+    # If the image was identified but no lift records exist, tell the LLM explicitly.
+    progression_ctx = state.get("progression_context", []) or []
+    is_cross_modal = state.get("query_type") == QueryRoute.CROSS_MODAL.value
+    if matched_exercise_name and is_cross_modal and not progression_ctx:
+        progression_display = [
+            f"No personal best recorded yet for {matched_exercise_name}."
+        ]
+    else:
+        progression_display = progression_ctx
+
     parts.append(
         f"Query: {state['query']}\n\n"
         f"Retrieved exercises:\n{_fmt(state.get('retrieved_text_context', []))}\n\n"
         f"User's personal bests for relevant exercises:\n"
-        f"{_fmt(state.get('progression_context', []))}\n\n"
+        f"{_fmt(progression_display)}\n\n"
         f"Use these exact numbers when recommending weight. "
         f"If bench press best is 35 kg × 6, recommend 35–37.5 kg. "
         f"Always reference actual numbers, never say 'increase gradually'.\n\n"
@@ -537,16 +571,52 @@ def image_retrieval_node(state: AgentState) -> dict:
     records = search_similar_exercise_image(
         path, top_k=1, chroma_path=_CHROMA_PATH
     )
-    matched_exercise_name = ""
-    if records:
-        metadata = records[0].get("metadata") or {}
-        matched_exercise_name = str(
-            metadata.get("exercise_name") or metadata.get("exercise_label") or ""
-        ).strip()
+
+    _CLIP_CONFIDENCE_THRESHOLD = 0.25
+
+    if not records:
+        return {
+            "retrieved_image_context": [],
+            "show_images": True,
+            "matched_exercise_name": "",
+            "image_identification_note": (
+                "The uploaded image could not be matched to any exercise in your library "
+                "(no results returned). Please describe the exercise or upload a clearer image."
+            ),
+            "node_timings": {"image_retrieval": (time.perf_counter() - t0) * 1000},
+            "tool_calls_log": ["image_retrieval"],
+        }
+
+    top = records[0]
+    score = float(top.get("score", 0))
+    metadata = top.get("metadata") or {}
+    matched_exercise_name = str(
+        top.get("exercise_name")
+        or metadata.get("exercise_name")
+        or metadata.get("exercise_label")
+        or ""
+    ).strip()
+
+    if score < _CLIP_CONFIDENCE_THRESHOLD:
+        # Score too low to trust — tell generation not to guess
+        return {
+            "retrieved_image_context": [],
+            "show_images": False,
+            "matched_exercise_name": "",
+            "image_identification_note": (
+                f"The uploaded image could not be confidently matched to any exercise "
+                f"in your library (confidence: {score:.2f}). "
+                "Please describe the exercise or upload a clearer image."
+            ),
+            "node_timings": {"image_retrieval": (time.perf_counter() - t0) * 1000},
+            "tool_calls_log": ["image_retrieval"],
+        }
+
     return {
         "retrieved_image_context": _extract_docs(records),
         "show_images": True,
         "matched_exercise_name": matched_exercise_name,
+        "image_identification_note": None,
         "node_timings": {"image_retrieval": (time.perf_counter() - t0) * 1000},
         "tool_calls_log": ["image_retrieval"],
     }
@@ -591,17 +661,35 @@ def progression_analysis_node(state: AgentState) -> dict:
 
 
 def context_fusion_node(state: AgentState) -> dict:
-    """Signal that all parallel retrieval branches have completed.
+    """Join point after all parallel retrieval branches complete.
 
-    The ADD reducer on each list field means contexts are already merged by
-    the time this node runs.  This node exists as an explicit join point so
-    the graph topology is readable and the tool_calls_log is complete.
+    For cross_modal queries with a confident image match, runs a targeted
+    exact-filter lift-record lookup here (rather than in progression_analysis_node,
+    which runs in parallel with image_retrieval_node and therefore cannot read
+    the matched_exercise_name that image_retrieval_node writes).
     """
     t0 = time.perf_counter()
-    return {
+    result: dict = {
         "node_timings": {"context_fusion": (time.perf_counter() - t0) * 1000},
         "tool_calls_log": ["context_fusion"],
     }
+
+    matched = (state.get("matched_exercise_name") or "").strip()
+    is_cross_modal = state.get("query_type") == QueryRoute.CROSS_MODAL.value
+    if matched and is_cross_modal:
+        # Exact lookup: only this exercise's lift records, matched by name.
+        records = search_lift_records_by_text(
+            matched,
+            top_k=_get_top_k(),
+            chroma_path=_CHROMA_PATH,
+            exercise_name=matched,
+        )
+        if records:
+            result["progression_context"] = _extract_docs(records)
+        # If empty, _build_user_prompt will emit the "no personal best" message.
+
+    result["node_timings"]["context_fusion"] = (time.perf_counter() - t0) * 1000
+    return result
 
 
 def generation_node(state: AgentState) -> dict:
@@ -726,6 +814,7 @@ def run_graph(
         "retrieved_image_context": [],
         "show_images": False,
         "matched_exercise_name": None,
+        "image_identification_note": None,
         "node_timings": {},
         "recall_at_3": None,
         "injury_context": [],
