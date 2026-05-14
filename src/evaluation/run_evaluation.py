@@ -10,12 +10,24 @@ results to data/eval/results.csv:
   4. ablation_no_injury         — full agent with injury_lookup node disabled
 
 Metrics per query × condition:
-  - recall_at_k          Recall@3 against expected exercises
-  - mrr                  Mean Reciprocal Rank
+  - recall_at_k            Recall@3 against expected exercises
+  - mrr                    Mean Reciprocal Rank
   - personalization_score  1–5 rubric based on record types used
-  - relevance_score       1–5 rubric based on recall
-  - latency_ms           Wall-clock retrieval time
-  - tool_calls_count     Number of tools fired (from AgentState.tool_calls_log)
+  - relevance_score        1–5 rubric based on recall
+  - groundedness_score     1–5 rubric — how much of the response is traceable
+                           to retrieved context (exercise names cited)
+  - latency_ms             Wall-clock retrieval time
+  - tool_calls_count       Number of tools fired (from AgentState.tool_calls_log)
+
+LLM-as-judge prompt (groundedness dimension):
+  Score 3 — Groundedness (1-5):
+  Is the response grounded in the retrieved context?
+  1 = response ignores retrieved context entirely
+  3 = partially uses retrieved context
+  5 = every claim traceable to retrieved context
+
+  Implemented here as a deterministic heuristic: fraction of retrieved
+  exercise names that appear verbatim in the final_response, mapped to 1–5.
 """
 from __future__ import annotations
 
@@ -151,6 +163,52 @@ def _personalization_score(
     return max(1, min(score, 5))
 
 
+def _groundedness_score(
+    variant: str,
+    records: list[dict[str, Any]],
+    final_response: str,
+) -> int:
+    """Assign a 1–5 groundedness score.
+
+    Groundedness measures whether the generated response actually cites the
+    retrieved context.  Implemented as a deterministic heuristic matching
+    retrieved exercise names against the final_response text.
+
+    Scoring rubric
+    --------------
+    1 — plain_llm_baseline (no retrieval, no context to be grounded in)
+    2 — retrieval ran but no LLM response exists (text_only_retrieval),
+        OR response is empty / no exercise names were retrieved
+    3 — response mentions at least one retrieved exercise name
+    4 — response mentions ≥34 % of retrieved exercise names
+    5 — response mentions ≥67 % of retrieved exercise names
+    """
+    if variant == "plain_llm_baseline":
+        return 1
+    if not final_response or not records:
+        return 2
+
+    retrieved_names = [
+        _norm(_exercise_from_record(r))
+        for r in records
+        if _exercise_from_record(r)
+    ]
+    if not retrieved_names:
+        return 2
+
+    response_lower = final_response.lower()
+    hits = sum(1 for name in retrieved_names if name and name in response_lower)
+    ratio = hits / len(retrieved_names)
+
+    if ratio >= 0.67:
+        return 5
+    if ratio >= 0.34:
+        return 4
+    if ratio > 0:
+        return 3
+    return 2
+
+
 # ── baseline variants ──────────────────────────────────────────────────────────
 
 def _plain_baseline(query: str) -> list[dict[str, Any]]:
@@ -263,6 +321,7 @@ def _evaluate_variant(
         "mrr": round(mean_reciprocal_rank(expected_norm, retrieved_norm), 4),
         "personalization_score": _personalization_score(variant, category, records, route),
         "relevance_score": _response_relevance(records, expected),
+        "groundedness_score": _groundedness_score(variant, records, final_response),
         "latency_ms": round(latency_ms, 2),
         "tool_calls_count": tool_calls_count,
         "final_response": final_response,
@@ -331,10 +390,14 @@ def run_evaluation(
     df.to_csv(results_path, index=False)
     print(f"[EVAL] wrote {results_path} rows={len(df)}")
 
-    summary_cols = ["recall_at_k", "mrr", "personalization_score", "relevance_score", "latency_ms", "tool_calls_count"]
+    summary_cols = [
+        "recall_at_k", "mrr", "relevance_score",
+        "personalization_score", "groundedness_score",
+        "latency_ms", "tool_calls_count",
+    ]
     summary = df.groupby("system_name")[summary_cols].mean().round(3)
     print("[EVAL] summary")
-    print(summary)
+    print(summary.to_string())
     return df
 
 

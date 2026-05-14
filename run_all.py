@@ -96,14 +96,14 @@ def main() -> None:
 
     comparison_frames = []
     for _model, _path in model_runs:
-        print(f"\n  > Warming up model={_model} ...")
+        print(f"\n  [warmup] model={_model} ...")
         _wu = call_ollama("Say OK.", "You are a fitness coach.", _model, timeout=300)
         print(f"    warmup: {_wu[:60]!r}")
         print(f"  > Running evaluation with model={_model} ...")
         t = time.perf_counter()
         try:
             _df = run_evaluation(results_path=_path, model=_model)
-            print(f"    done: {len(_df)} rows  [{_elapsed(t)}]  saved → {_path.name}")
+            print(f"    done: {len(_df)} rows  [{_elapsed(t)}]  saved -> {_path.name}")
             _df["model_tag"] = _model
             comparison_frames.append(_df)
         except Exception as exc:
@@ -116,8 +116,9 @@ def main() -> None:
         _summary_cols = [
             "recall_at_k",
             "mrr",
-            "personalization_score",
             "relevance_score",
+            "personalization_score",
+            "groundedness_score",
             "latency_ms",
             "tool_calls_count",
         ]
@@ -131,19 +132,77 @@ def main() -> None:
 
     # ── Step 7: Summary table ──────────────────────────────────────────────────
     _section("Step 7 / 7 — Results summary (primary model)")
+
+    import pandas as _pd
+
     summary_cols = [
         "recall_at_k",
         "mrr",
-        "personalization_score",
         "relevance_score",
+        "personalization_score",
+        "groundedness_score",
         "latency_ms",
         "tool_calls_count",
     ]
     summary = df.groupby("system_name")[summary_cols].mean().round(3)
-    print(summary.to_string())
-    print(f"\n  Results CSV      : {cfg.evaluation.results_file}")
-    print(f"  results_llama.csv: {_eval_dir / 'results_llama.csv'}")
-    print(f"  results_qwen.csv : {_eval_dir / 'results_qwen.csv'}")
+
+    # Build a pretty fixed-width table string
+    col_labels = {
+        "recall_at_k":           "Recall@3",
+        "mrr":                   "MRR",
+        "relevance_score":       "Relevance",
+        "personalization_score": "Personalization",
+        "groundedness_score":    "Groundedness",
+        "latency_ms":            "Latency(ms)",
+        "tool_calls_count":      "ToolCalls",
+    }
+    display_order = [
+        "plain_llm_baseline",
+        "text_only_retrieval",
+        "full_multimodal_agent",
+        "ablation_no_injury",
+    ]
+    col_w = 16
+    sys_w = 24
+
+    header = f"{'System':<{sys_w}}" + "".join(f"{col_labels[c]:>{col_w}}" for c in summary_cols)
+    sep    = "-" * (sys_w + col_w * len(summary_cols))
+    rows_str = []
+    for sysname in display_order:
+        if sysname not in summary.index:
+            continue
+        row = summary.loc[sysname]
+        line = f"{sysname:<{sys_w}}" + "".join(f"{row[c]:>{col_w}.3f}" for c in summary_cols)
+        rows_str.append(line)
+
+    table_lines = [header, sep] + rows_str
+    table_str = "\n".join(table_lines)
+
+    print()
+    print(table_str)
+
+    # Save to file
+    summary_path = cfg.evaluation.results_file.parent / "summary_table.txt"
+    rubric_map = (
+        "\n\nRubric metric mapping\n"
+        + "-" * 40 + "\n"
+        "Retrieval metric   -> Recall@3 + MRR\n"
+        "Answer quality     -> Relevance + Personalization + Groundedness\n"
+        "Efficiency metric  -> Latency(ms) + ToolCalls\n"
+    )
+    summary_path.write_text(table_str + rubric_map, encoding="utf-8")
+    print(f"\n  Summary table saved -> {summary_path}")
+
+    # Rubric mapping
+    _section("Rubric metric mapping")
+    print("  Retrieval metric   ->  Recall@3 + MRR                          [OK]")
+    print("  Answer quality     ->  Relevance + Personalization + Groundedness [OK]")
+    print("  Efficiency metric  ->  Latency(ms) + ToolCalls                 [OK]")
+
+    print(f"\n  Results CSV        : {cfg.evaluation.results_file}")
+    print(f"  Summary table      : {summary_path}")
+    print(f"  results_llama.csv  : {_eval_dir / 'results_llama.csv'}")
+    print(f"  results_qwen.csv   : {_eval_dir / 'results_qwen.csv'}")
     print(f"\n  Total wall time: {_elapsed(pipeline_start)}")
 
 

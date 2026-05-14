@@ -1,0 +1,12 @@
+System                          Recall@3             MRR       Relevance Personalization    Groundedness     Latency(ms)       ToolCalls
+----------------------------------------------------------------------------------------------------------------------------------------
+plain_llm_baseline                 0.000           0.000           2.000           1.000           1.000           0.001           0.000
+text_only_retrieval                0.606           0.727           3.818           3.000           2.000          32.227           1.000
+full_multimodal_agent              0.636           0.712           3.909           4.455           3.727       18600.514           4.909
+ablation_no_injury                 0.636           0.712           3.909           4.455           3.273       15292.882           4.909
+
+Rubric metric mapping
+----------------------------------------
+Retrieval metric   -> Recall@3 + MRR
+Answer quality     -> Relevance + Personalization + Groundedness
+Efficiency metric  -> Latency(ms) + ToolCalls
