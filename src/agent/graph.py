@@ -5,29 +5,39 @@ Graph topology
 --------------
 START → router
 router  →  (conditional fan-out based on query_type)
-    factual_retrieval      → text_retrieval
-    cross_modal            → image_retrieval
-    analytical             → text_retrieval + injury_lookup + progression_analysis
-    personalized_followup  → text_retrieval + injury_lookup
-All retrieval nodes → context_fusion → generation → END
+    greeting                                      → generation (no retrieval)
+    factual_retrieval                             → text_retrieval + progression_analysis
+    cross_modal                                   → image_retrieval + text_retrieval
+    analytical                                    → text_retrieval + progression_analysis
+    personalized_followup (no injury keywords)    → text_retrieval + progression_analysis
+    personalized_followup (with injury keywords)  → text_retrieval + progression_analysis + injury_lookup
+All retrieval nodes → context_fusion → generation → END.
 
-Every node appends its own name to tool_calls_log so callers can audit the
-full execution path from AgentState.tool_calls_log.
+injury_lookup ONLY fires when the query explicitly mentions pain/injury
+terminology (see _INJURY_KEYWORD_PATTERN). Every node appends its own name
+to tool_calls_log so callers can audit the full execution path from
+AgentState.tool_calls_log.
 """
 from __future__ import annotations
 
 import json
+import os
+import re
 import sys
+import time
 import urllib.error
 import urllib.request
 from pathlib import Path
 from typing import Any
 
+from dotenv import load_dotenv
 from langgraph.graph import END, StateGraph
 
 ROOT = Path(__file__).resolve().parents[2]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
+
+load_dotenv(ROOT / ".env")
 
 from src.agent.router import QueryRoute, QueryRouter
 from src.agent.state import AgentState
@@ -54,30 +64,132 @@ _chroma_client(_CHROMA_PATH)
 # ── LLM prompts ────────────────────────────────────────────────────────────────
 
 _SYSTEM_PROMPT = (
-    "You are the user's personal training partner who knows their full history. "
-    "Be direct and conversational — like a coach texting a friend, not writing a report.\n\n"
-    "Rules:\n"
-    "- Maximum 3-4 sentences per response\n"
-    "- Never use bullet points or numbered lists\n"
+    "You are FitSupport, a personal training coach. Follow these rules strictly:\n\n"
+    "GREETING / INTRODUCTION RULES:\n"
+    "- If the user asks what you can do, who you are, or says hello/hi/hey, "
+    "respond with exactly this style (keep the line breaks and the bullet list):\n\n"
+    "  I'm FitSupport, your personal training assistant. I know your workout "
+    "history, personal bests, and injury context. Ask me things like:\n"
+    "  - What weight should I use for hack squat today?\n"
+    "  - My knee hurts, what can I train?\n"
+    "  - [upload an image] What exercise is this and what's my best on it?\n"
+    "  - I did chest yesterday, what should I train today?\n\n"
+    "- Do not retrieve, invent, or reference any context for greetings. "
+    "Just introduce yourself.\n\n"
+    "SAFETY RULES (never break these):\n"
+    "- If user mentions pain, stiffness, or discomfort today, "
+    "always reduce weight by 15-20% or suggest an alternative\n"
+    "- Never recommend an exercise the user already did today\n"
+    "- Always acknowledge the injury/discomfort explicitly first\n\n"
+    "KNEE PAIN RULES — if user mentions knee pain/hurt/sore today:\n"
+    "- NEVER recommend: leg press, squats, hack squat, lunges, "
+    "or any knee-dominant movement\n"
+    "- ALWAYS recommend: upper body work, seated cable rows, lat pulldowns, "
+    "hip thrusts (if pain is only at knee flexion), lying leg curls at light "
+    "weight, upper body push/pull movements\n"
+    "- Say explicitly, without starting the response with 'Given your': \"with your knee pain today, let's keep legs out of "
+    "it entirely. Here's what you can do instead: [upper body options]\"\n\n"
+    "CONTEXT RULES:\n"
+    "- If user already did squats + leg press today, their quads are fatigued "
+    "— do not recommend more quad-dominant work\n"
+    "- Suggest what's MISSING from today's session, not more of the same\n\n"
+    "STYLE RULES:\n"
+    "- Maximum 3-4 sentences per response (greetings are the only exception — "
+    "use the exact greeting block above)\n"
+    "- Never use bullet points or numbered lists (except inside the greeting block)\n"
     "- Lead with the actual recommendation immediately\n"
+    "- NEVER start your response with 'Given your recent performance' or any variation of it. "
+    "Never start with 'Given your...'. Vary your opening naturally. Examples: "
+    "'Your hack squat is at 140kg x 6 so...', "
+    "'Based on where you're at with hack squat...', "
+    "'You hit 140kg last session —', "
+    "'For hack squat today,', "
+    "'Looking at your progression,'. "
+    "Start mid thought like a coach would, not like a report. Try to give motivation.\n"
     "- Reference their real numbers casually e.g. 'you hit 140kg last time so try 142.5kg today'\n"
-    "- If injury is relevant, weave it in naturally e.g. 'given your knee, maybe drop to 130kg "
-    "and focus on the stretch'\n"
     "- Never say 'No injury conflicts were found'\n"
     "- Never say 'based on retrieved information'\n"
     "- Never end with generic disclaimers\n"
     "- Sound like you actually know them\n\n"
-    "Example of BAD response: 'Weight: 140-145kg. Sets: 4. Reps: 6-7. No injury conflicts found.'\n"
-    "Example of GOOD response: 'You hit 140kg x 6 last session so try 142.5kg today for 4 sets. "
-    "Keep it to parallel depth given the knee — full depth hack squats with that load will "
-    "aggravate it. Control the negative hard.'"
+    "EXAMPLE:\n"
+    "User: 'did squats, leg press, hamstring curl, knee stiff'\n"
+    "BAD: 'do back squat at 142.5kg'\n"
+    "GOOD: 'quads and hamstrings are covered, knee is stiff so skip anything heavy. "
+    "Maybe finish with seated calf raises or some light hip thrusts focusing on the stretch "
+    "— keep it under 100kg today given the knee.'"
 )
+
+
+# ── Greeting & injury keyword detection ────────────────────────────────────────
+
+_GREETING_PATTERN = re.compile(
+    r"^\s*(hi|hello|hey|yo|sup|hola|howdy|greetings|"
+    r"good\s+(morning|afternoon|evening|day))\b",
+    re.IGNORECASE,
+)
+_CAPABILITY_PATTERN = re.compile(
+    r"\b("
+    r"what\s+can\s+you\s+do|"
+    r"who\s+are\s+you|"
+    r"what\s+are\s+you|"
+    r"how\s+do\s+you\s+work|"
+    r"how\s+can\s+you\s+help|"
+    r"what\s+do\s+you\s+do|"
+    r"introduce\s+yourself|"
+    r"tell\s+me\s+about\s+yourself"
+    r")\b",
+    re.IGNORECASE,
+)
+_INJURY_KEYWORD_PATTERN = re.compile(
+    r"\b("
+    r"pain|painful|hurt|hurts|hurting|sore|soreness|stiff|stiffness|"
+    r"injury|injured|injuries|discomfort|ache|aches|aching|"
+    r"strain|strained|sprain|sprained|tweak|tweaked|"
+    r"avoid|careful|"
+    r"bad\s+(knee|shoulder|back|hip|elbow|wrist|ankle|neck)"
+    r")\b",
+    re.IGNORECASE,
+)
+
+
+def _is_greeting_query(query: str) -> bool:
+    """Return True if the query is a pure greeting or capability question."""
+    q = (query or "").strip()
+    if not q:
+        return False
+    q_clean = re.sub(r"[!?.\s]+", " ", q.lower()).strip()
+    greeting_terms = {
+        "hi",
+        "hello",
+        "hey",
+        "yo",
+        "sup",
+        "hola",
+        "howdy",
+        "greetings",
+        "good morning",
+        "good afternoon",
+        "good evening",
+        "good day",
+    }
+    if q_clean in greeting_terms:
+        return True
+    if _CAPABILITY_PATTERN.fullmatch(q_clean):
+        return True
+    return False
+
+
+def _has_injury_keywords(query: str) -> bool:
+    """Return True if the query explicitly mentions pain/injury terminology."""
+    return bool(_INJURY_KEYWORD_PATTERN.search(query or ""))
 
 # ── Runtime overrides ──────────────────────────────────────────────────────────
 # Use set_active_model() / set_top_k_override() to change at runtime (UI, eval).
 
 _active_model: str | None = None
 _top_k_override: int | None = None
+_GEMINI_SELECTORS = {"gemini", "google", "google-gemini"}
+_OLLAMA_SELECTORS = {"qwen", "quen", "quinn", "ollama", "local"}
 
 # Once Ollama is confirmed unreachable (first failed call), we skip further
 # network attempts in the same process to avoid long timeouts in batch runs.
@@ -98,6 +210,26 @@ def set_top_k_override(top_k: int | None) -> None:
 
 def _get_model() -> str:
     return _active_model if _active_model is not None else cfg.llm.primary_model
+
+
+def _get_provider(model: str) -> str:
+    selector = model.strip().lower()
+    if selector in _GEMINI_SELECTORS or selector.startswith("gemini"):
+        return "gemini"
+    if _active_model is None:
+        return cfg.llm.provider
+    return "ollama"
+
+
+def _get_provider_model(model: str, provider: str) -> str:
+    selector = model.strip().lower()
+    if provider == "gemini":
+        if _active_model is None or selector in _GEMINI_SELECTORS:
+            return cfg.llm.gemini_model
+        return model
+    if _active_model is None or selector in _OLLAMA_SELECTORS:
+        return cfg.llm.primary_model
+    return model
 
 
 def _get_top_k() -> int:
@@ -187,11 +319,69 @@ def check_ollama(base_url: str | None = None) -> bool:
         return False
 
 
+# ── Gemini integration ─────────────────────────────────────────────────────────
+
+def call_gemini(
+    user_prompt: str,
+    system_prompt: str,
+    model: str,
+    timeout: int = 60,
+) -> str:
+    """Call Gemini's generateContent endpoint and return the response text."""
+    api_key = os.getenv(cfg.llm.gemini_api_key_env)
+    if not api_key:
+        return (
+            f"[Gemini API key missing — set {cfg.llm.gemini_api_key_env} "
+            "in your local .env file.]"
+        )
+
+    payload = json.dumps(
+        {
+            "system_instruction": {"parts": [{"text": system_prompt}]},
+            "contents": [{"role": "user", "parts": [{"text": user_prompt}]}],
+        }
+    ).encode("utf-8")
+    req = urllib.request.Request(
+        f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={api_key}",
+        data=payload,
+        headers={"Content-Type": "application/json"},
+        method="POST",
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=timeout) as resp:
+            data = json.loads(resp.read().decode("utf-8"))
+    except urllib.error.HTTPError as exc:
+        detail = exc.read().decode("utf-8", errors="replace")[:500]
+        return f"[Gemini API error {exc.code}: {detail}]"
+    except urllib.error.URLError as exc:
+        return f"[Gemini connection error: {exc.reason}]"
+    except (TimeoutError, OSError) as exc:
+        return f"[Gemini response timeout after {timeout}s: {exc}]"
+    except json.JSONDecodeError as exc:
+        return f"[Gemini response parse error: {exc}]"
+
+    try:
+        parts = data["candidates"][0]["content"]["parts"]
+        return "".join(str(part.get("text", "")) for part in parts).strip()
+    except (KeyError, IndexError, TypeError) as exc:
+        return f"[Gemini response parse error: {exc}]"
+
+
 def _build_user_prompt(state: AgentState) -> str:
     """Assemble the user-turn prompt from all accumulated context fields in state."""
 
     def _fmt(items: list[str]) -> str:
         return "\n".join(f"- {item}" for item in items) if items else "None"
+
+    # Greetings bypass the retrieval template entirely — the LLM should only
+    # see the user's message and follow the GREETING rules in the system prompt.
+    if state.get("query_type") == "greeting":
+        return (
+            f"The user said: {state['query']!r}\n\n"
+            "Follow the GREETING / INTRODUCTION RULES in your system prompt. "
+            "Introduce yourself as FitSupport using the exact example list. "
+            "Do not invent workout numbers, weights, or retrieval results."
+        )
 
     parts: list[str] = []
 
@@ -209,6 +399,15 @@ def _build_user_prompt(state: AgentState) -> str:
         )
 
     image_context = state.get("retrieved_image_context", []) if state.get("show_images") else []
+    matched_exercise_name = (state.get("matched_exercise_name") or "").strip()
+    if matched_exercise_name:
+        parts.append(
+            "The uploaded image was matched to: "
+            f"{matched_exercise_name} in the user's exercise library. "
+            "Use this exact name when responding — do not guess a different exercise. "
+            "If you need a short lead-in, use one line max: "
+            "'FitSupport — here's what I found:'"
+        )
     parts.append(
         f"Query: {state['query']}\n\n"
         f"Retrieved exercises:\n{_fmt(state.get('retrieved_text_context', []))}\n\n"
@@ -237,12 +436,28 @@ def _extract_docs(records: list[dict[str, Any]]) -> list[str]:
 def router_node(state: AgentState) -> dict:
     """Classify the query and write query_type into state.
 
-    Uses the rule-based QueryRouter so routing is deterministic and
-    reproducible across evaluation runs.
+    Detects pure greetings/capability questions first (no retrieval needed),
+    otherwise delegates to the rule-based QueryRouter so routing is
+    deterministic and reproducible across evaluation runs.
     """
-    routed = QueryRouter().route(state["query"], image_path=state.get("image_path"))
+    t0 = time.perf_counter()
+    query = state["query"]
+    image_path = state.get("image_path")
+
+    # Greetings/capability questions with no image attached short-circuit
+    # to generation — no retrieval is needed and any retrieved context
+    # would just confuse the introduction response.
+    if not image_path and _is_greeting_query(query):
+        return {
+            "query_type": "greeting",
+            "node_timings": {"router": (time.perf_counter() - t0) * 1000},
+            "tool_calls_log": ["router"],
+        }
+
+    routed = QueryRouter().route(query, image_path=image_path)
     return {
         "query_type": routed.route.value,
+        "node_timings": {"router": (time.perf_counter() - t0) * 1000},
         "tool_calls_log": ["router"],
     }
 
@@ -255,6 +470,7 @@ def text_retrieval_node(state: AgentState) -> dict:
     the UI render the matching exercise visually without requiring the user
     to upload an image first.
     """
+    t0 = time.perf_counter()
     records = search_exercise_by_text(
         state["query"],
         top_k=_get_top_k(),
@@ -262,26 +478,29 @@ def text_retrieval_node(state: AgentState) -> dict:
     )
 
     image_docs: list[str] = []
-    for rec in records:
-        exercise_name = str((rec.get("metadata") or {}).get("exercise_name", "")).strip()
-        if not exercise_name:
-            continue
-        image_records = get_images_by_exercise_label(
-            exercise_name, chroma_path=_CHROMA_PATH, limit=3
-        )
-        if image_records:
-            image_docs.extend(_extract_docs(image_records))
-            break
+    if state.get("query_type") != QueryRoute.CROSS_MODAL.value:
+        for rec in records:
+            exercise_name = str((rec.get("metadata") or {}).get("exercise_name", "")).strip()
+            if not exercise_name:
+                continue
+            image_records = get_images_by_exercise_label(
+                exercise_name, chroma_path=_CHROMA_PATH, limit=3
+            )
+            if image_records:
+                image_docs.extend(_extract_docs(image_records))
+                break
 
     return {
         "retrieved_text_context": _extract_docs(records),
         "retrieved_image_context": image_docs,
+        "node_timings": {"text_retrieval": (time.perf_counter() - t0) * 1000},
         "tool_calls_log": ["text_retrieval"],
     }
 
 
 def image_retrieval_node(state: AgentState) -> dict:
     """Retrieve similar exercise images via CLIP embedding search against fitness_images."""
+    t0 = time.perf_counter()
     image_path = state.get("image_path")
     if not image_path:
         records = search_exercise_by_text(
@@ -302,6 +521,7 @@ def image_retrieval_node(state: AgentState) -> dict:
         return {
             "retrieved_image_context": image_docs,
             "show_images": True,
+            "node_timings": {"image_retrieval": (time.perf_counter() - t0) * 1000},
             "tool_calls_log": ["image_retrieval"],
         }
     path = Path(image_path)
@@ -311,23 +531,34 @@ def image_retrieval_node(state: AgentState) -> dict:
         return {
             "retrieved_image_context": [],
             "show_images": True,
+            "node_timings": {"image_retrieval": (time.perf_counter() - t0) * 1000},
             "tool_calls_log": ["image_retrieval"],
         }
     records = search_similar_exercise_image(
-        path, top_k=_get_top_k(), chroma_path=_CHROMA_PATH
+        path, top_k=1, chroma_path=_CHROMA_PATH
     )
+    matched_exercise_name = ""
+    if records:
+        metadata = records[0].get("metadata") or {}
+        matched_exercise_name = str(
+            metadata.get("exercise_name") or metadata.get("exercise_label") or ""
+        ).strip()
     return {
         "retrieved_image_context": _extract_docs(records),
         "show_images": True,
+        "matched_exercise_name": matched_exercise_name,
+        "node_timings": {"image_retrieval": (time.perf_counter() - t0) * 1000},
         "tool_calls_log": ["image_retrieval"],
     }
 
 
 def injury_lookup_node(state: AgentState) -> dict:
     """Load injury-memory records that match body-part terms in the query."""
+    t0 = time.perf_counter()
     result = InjuryMemoryTool().run(state["query"], top_k=_get_top_k())
     return {
         "injury_context": _extract_docs(result.records),
+        "node_timings": {"injury_lookup": (time.perf_counter() - t0) * 1000},
         "tool_calls_log": ["injury_lookup"],
     }
 
@@ -342,6 +573,7 @@ def progression_analysis_node(state: AgentState) -> dict:
     Falls back to the CSV-based ``StrengthProgressionTool`` if ChromaDB returns
     nothing (e.g. before the index has been built).
     """
+    t0 = time.perf_counter()
     records = search_lift_records_by_text(
         state["query"],
         top_k=_get_top_k(),
@@ -353,6 +585,7 @@ def progression_analysis_node(state: AgentState) -> dict:
 
     return {
         "progression_context": _extract_docs(records),
+        "node_timings": {"progression_analysis": (time.perf_counter() - t0) * 1000},
         "tool_calls_log": ["progression_analysis"],
     }
 
@@ -364,22 +597,33 @@ def context_fusion_node(state: AgentState) -> dict:
     the time this node runs.  This node exists as an explicit join point so
     the graph topology is readable and the tool_calls_log is complete.
     """
-    return {"tool_calls_log": ["context_fusion"]}
+    t0 = time.perf_counter()
+    return {
+        "node_timings": {"context_fusion": (time.perf_counter() - t0) * 1000},
+        "tool_calls_log": ["context_fusion"],
+    }
 
 
 def generation_node(state: AgentState) -> dict:
-    """Call Ollama to generate a personalised fitness coaching response.
+    """Call the configured LLM to generate a personalised fitness coaching response.
 
     Uses _get_model() which respects any active model override, defaulting to
     cfg.llm.primary_model.  All four context buckets from AgentState are
     injected into the user prompt so the LLM has full retrieval context.
     """
+    t0 = time.perf_counter()
     model = _get_model()
+    provider = _get_provider(model)
+    provider_model = _get_provider_model(model, provider)
     user_prompt = _build_user_prompt(state)
-    # 300 s covers cold-start model loading (4-5 GB models can take 2-3 min).
-    response = call_ollama(user_prompt, _SYSTEM_PROMPT, model, timeout=300)
+    if provider == "gemini":
+        response = call_gemini(user_prompt, _SYSTEM_PROMPT, provider_model, timeout=300)
+    else:
+        # 300 s covers cold-start model loading (4-5 GB models can take 2-3 min).
+        response = call_ollama(user_prompt, _SYSTEM_PROMPT, provider_model, timeout=300)
     return {
         "final_response": response,
+        "node_timings": {"generation": (time.perf_counter() - t0) * 1000},
         "tool_calls_log": ["generation"],
     }
 
@@ -389,19 +633,33 @@ def generation_node(state: AgentState) -> dict:
 def route_by_query_type(state: AgentState) -> list[str]:
     """Map query_type to the set of retrieval nodes to activate (fan-out).
 
+    Routing rules (Issue #2 fix — injury_lookup only fires on injury keywords):
+      - greeting                                  → ["generation"]   (skip ALL retrieval)
+      - factual_retrieval                         → text_retrieval + progression_analysis
+      - cross_modal                               → image_retrieval + text_retrieval
+      - analytical                                → text_retrieval + progression_analysis
+      - personalized_followup w/ injury keywords  → text_retrieval + progression_analysis + injury_lookup
+      - personalized_followup w/o injury keywords → text_retrieval + progression_analysis
+
     Returns a list so LangGraph runs all listed nodes in parallel within the
     same superstep.  Nodes share state via the ADD reducer.
     """
     qt = state["query_type"]
+    query = state.get("query", "")
+
+    if qt == "greeting":
+        return ["generation"]
     if qt == QueryRoute.CROSS_MODAL:
-        return ["image_retrieval"]
+        return ["image_retrieval", "text_retrieval"]
     if qt == QueryRoute.FACTUAL_RETRIEVAL:
-        return ["text_retrieval"]
+        return ["text_retrieval", "progression_analysis"]
     if qt == QueryRoute.ANALYTICAL:
-        return ["text_retrieval", "injury_lookup", "progression_analysis"]
+        return ["text_retrieval", "progression_analysis"]
     if qt == QueryRoute.PERSONALIZED_FOLLOWUP:
-        return ["text_retrieval", "injury_lookup", "progression_analysis"]
-    return ["text_retrieval"]
+        if _has_injury_keywords(query):
+            return ["text_retrieval", "progression_analysis", "injury_lookup"]
+        return ["text_retrieval", "progression_analysis"]
+    return ["text_retrieval", "progression_analysis"]
 
 
 # ── graph construction ─────────────────────────────────────────────────────────
@@ -467,13 +725,21 @@ def run_graph(
         "retrieved_text_context": [],
         "retrieved_image_context": [],
         "show_images": False,
+        "matched_exercise_name": None,
+        "node_timings": {},
+        "recall_at_3": None,
         "injury_context": [],
         "progression_context": [],
         "tool_calls_log": [],
         "final_response": "",
         "conversation_history": conversation_history or [],
     }
-    return compiled_graph.invoke(initial)
+    t0 = time.perf_counter()
+    state = compiled_graph.invoke(initial)
+    node_timings = dict(state.get("node_timings", {}))
+    node_timings["total"] = (time.perf_counter() - t0) * 1000
+    state["node_timings"] = node_timings
+    return state
 
 
 def run_graph_with_model(

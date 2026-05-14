@@ -29,6 +29,12 @@ class AgentState(TypedDict):
         Accumulated image documents from CLIP search.
     show_images : bool
         Whether the UI should render image results for this turn.
+    matched_exercise_name : Optional[str]
+        Exercise name matched from an uploaded image.
+    node_timings : Dict[str, float]
+        Per-node runtime in milliseconds for the current graph invocation.
+    recall_at_3 : Optional[float]
+        Live Recall@3 when ground truth is available; None during normal UI chat.
     injury_context : List[str]
         Injury-memory records relevant to the query.
     progression_context : List[str]
@@ -48,6 +54,9 @@ class AgentState(TypedDict):
     retrieved_text_context: Annotated[List[str], operator.add]
     retrieved_image_context: Annotated[List[str], operator.add]
     show_images: bool
+    matched_exercise_name: Optional[str]
+    node_timings: Annotated[Dict[str, float], operator.or_]
+    recall_at_3: Optional[float]
     injury_context: Annotated[List[str], operator.add]
     progression_context: Annotated[List[str], operator.add]
     tool_calls_log: Annotated[List[str], operator.add]

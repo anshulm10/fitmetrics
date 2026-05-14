@@ -9,6 +9,7 @@ from __future__ import annotations
 import sys
 import tempfile
 import time
+import re
 from pathlib import Path
 
 _UI_DIR = Path(__file__).resolve().parent
@@ -156,6 +157,172 @@ if "last_image_bytes" not in st.session_state:
 if "last_image_suffix" not in st.session_state:
     st.session_state.last_image_suffix = ".jpg"
 
+
+def _format_ms(ms: float | int | None) -> str:
+    if ms is None:
+        return "N/A"
+    return f"{float(ms):,.0f}ms"
+
+
+def _format_seconds(ms: float | int | None) -> str:
+    """Render a millisecond duration as compact seconds, e.g. 18234ms → '18.2s'."""
+    if ms is None:
+        return "N/A"
+    return f"{float(ms) / 1000:.1f}s"
+
+
+def _context_preview(items: list[str], limit: int = 3) -> str:
+    if not items:
+        return "None"
+    preview: list[str] = []
+    for item in items[:limit]:
+        text = str(item).strip()
+        first_line = text.splitlines()[0] if text else ""
+        preview.append(first_line[:120])
+    return ", ".join(preview) if preview else "None"
+
+
+def _tool_chain(tools: list[str]) -> str:
+    labels = {
+        "text_retrieval": "text",
+        "image_retrieval": "image",
+        "injury_lookup": "injury",
+        "progression_analysis": "progression",
+        "context_fusion": "fusion",
+    }
+    return " → ".join(labels.get(tool, tool) for tool in tools) if tools else "none"
+
+
+def _retrieval_counts(state: dict) -> str:
+    """Return a compact 'text:N progression:N' string, hiding any count == 0.
+
+    A tool that didn't fire (or fired but returned no results) should never
+    appear in the metrics bar — e.g. don't show 'injury:0' when injury_lookup
+    didn't run on this query.
+    """
+    counts = {
+        "text": len(state.get("retrieved_text_context", []) or []),
+        "images": len(state.get("retrieved_image_context", []) or []),
+        "progression": len(state.get("progression_context", []) or []),
+        "injury": len(state.get("injury_context", []) or []),
+    }
+    parts = [f"{name}:{n}" for name, n in counts.items() if n > 0]
+    return "  ".join(parts) if parts else "no retrieval"
+
+
+def _exercise_names(items: list[str], limit: int = 3) -> str:
+    names: list[str] = []
+    for item in items:
+        text = str(item)
+        match = re.search(r"exercise name:\s*([^\.]+)", text, flags=re.IGNORECASE)
+        if match:
+            name = match.group(1).strip()
+        else:
+            match = re.search(r"lift history for\s*([^\.]+)", text, flags=re.IGNORECASE)
+            name = match.group(1).strip() if match else text.split(":", 1)[0].strip()
+        if name and name not in names:
+            names.append(name)
+        if len(names) >= limit:
+            break
+    return ", ".join(names) if names else "None"
+
+
+def _short_progression(items: list[str], limit: int = 2) -> str:
+    cleaned: list[str] = []
+    for item in items[:limit]:
+        text = str(item).strip()
+        text = text.replace("best_weight_kg=", "").replace("best_reps=", "x ")
+        text = text.replace(", notes=", ", ")
+        cleaned.append(text[:140])
+    return ", ".join(cleaned) if cleaned else "None"
+
+
+def _wants_movement_frames(query: str) -> bool:
+    q = query.lower()
+    return "show me the movement" in q or "show me the frames" in q
+
+
+def _render_metrics_bar(msg: dict) -> None:
+    metrics = msg.get("metrics") or {}
+    state = msg.get("state") or {}
+    session_queries = len([m for m in st.session_state.messages if m.get("role") == "assistant"])
+    bar = (
+        f"⏱ {_format_seconds(metrics.get('total_latency_ms'))}"
+        f" · q:{session_queries}"
+        f" · {_tool_chain(msg.get('tool_calls_log', []))}"
+        f" · {_retrieval_counts(state)}"
+    )
+    st.markdown(f'<p class="meta-strip">{bar}</p>', unsafe_allow_html=True)
+
+
+def _render_details(msg: dict) -> None:
+    metrics = msg.get("metrics") or {}
+    state = msg.get("state") or {}
+    node_timings = state.get("node_timings", {})
+    if not state and not node_timings:
+        return
+    ordered_nodes = [
+        "router",
+        "injury_lookup",
+        "text_retrieval",
+        "image_retrieval",
+        "progression_analysis",
+        "context_fusion",
+        "generation",
+    ]
+    labels = {
+        "progression_analysis": "progression",
+    }
+    with st.expander("Details", expanded=False):
+        lines: list[str] = []
+        lines.append("Node timings:")
+        seen: set[str] = set()
+        for name in ordered_nodes:
+            if name in node_timings:
+                label = labels.get(name, name)
+                lines.append(f"{label:<16} {_format_ms(node_timings[name])}")
+                seen.add(name)
+        for name, ms in node_timings.items():
+            if name not in seen and name != "total":
+                lines.append(f"{name:<16} {_format_ms(ms)}")
+        if "total" in node_timings or metrics.get("total_latency_ms") is not None:
+            lines.append(f"{'total':<16} {_format_ms(node_timings.get('total', metrics.get('total_latency_ms')))}")
+        lines.extend([
+            "",
+            "Retrieved:",
+            f"Exercises: {_exercise_names(state.get('retrieved_text_context', []))}",
+            f"Injury flags: {_context_preview(state.get('injury_context', []), limit=2)}",
+            f"Progression: {_short_progression(state.get('progression_context', []), limit=2)}",
+        ])
+        st.code("\n".join(lines), language="text")
+
+
+def _render_assistant_debug(msg: dict) -> None:
+    _render_metrics_bar(msg)
+    _render_details(msg)
+
+
+def _render_session_stats() -> None:
+    assistant_messages = [m for m in st.session_state.messages if m.get("role") == "assistant"]
+    if not assistant_messages:
+        return
+    latencies = [
+        float(m["metrics"]["total_latency_ms"])
+        for m in assistant_messages
+        if m.get("metrics", {}).get("total_latency_ms") is not None
+    ]
+    avg_latency = sum(latencies) / len(latencies) if latencies else None
+    tool_counts: dict[str, int] = {}
+    for msg in assistant_messages:
+        for tool in msg.get("tool_calls_log", []):
+            tool_counts[tool] = tool_counts.get(tool, 0) + 1
+    tools_text = " ".join(f"{name}({count})" for name, count in tool_counts.items()) or "none"
+    st.caption(
+        f"This session: {len(assistant_messages)} queries · "
+        f"avg latency {_format_seconds(avg_latency)} · "
+        f"tools fired: {tools_text}"
+    )
+
 # ── Header row (title + clear button) ─────────────────────────────────────────
 
 header_col, clear_col = st.columns([6, 1])
@@ -163,7 +330,7 @@ with header_col:
     st.markdown("## FitSupport")
     st.caption(
         f"Jeff Nippard methodology · injury-aware · "
-        f"`{cfg.llm.primary_model}` · top-k {cfg.retrieval.top_k}"
+        f"`{cfg.llm.provider}:{cfg.llm.active_model_name}` · top-k {cfg.retrieval.top_k}"
     )
 with clear_col:
     st.markdown("<div style='margin-top:0.6rem'></div>", unsafe_allow_html=True)
@@ -181,17 +348,28 @@ st.markdown("<hr>", unsafe_allow_html=True)
 for msg in st.session_state.messages:
     with st.chat_message(msg["role"]):
         st.markdown(msg["content"])
+        if msg["role"] == "assistant":
+            _render_assistant_debug(msg)
         if msg.get("image_bytes"):
             with st.expander("Uploaded image", expanded=False):
                 st.image(msg["image_bytes"], use_container_width=True)
         if msg.get("show_images") and msg.get("retrieved_images"):
+            state = msg.get("state") or {}
+            can_show_images = state.get("query_type") == QueryRoute.CROSS_MODAL.value or msg.get("image_uploaded")
+            if not can_show_images:
+                continue
             valid = [p for p in msg["retrieved_images"] if p and Path(p).is_file()]
             if valid:
-                cols = st.columns(min(len(valid), 3))
-                for col, p in zip(cols, valid[:3]):
-                    with col:
-                        st.image(p, use_container_width=True)
-                        st.caption(Path(p).parent.name.replace("_", " ").title())
+                if msg.get("show_frames"):
+                    cols = st.columns(min(len(valid), 3))
+                    for col, p in zip(cols, valid[:3]):
+                        with col:
+                            st.image(p, use_container_width=True)
+                            st.caption(Path(p).parent.name.replace("_", " ").title())
+                else:
+                    p = valid[0]
+                    st.image(p, use_container_width=True)
+                    st.caption(Path(p).parent.name.replace("_", " ").title())
 
 # ── Input area ─────────────────────────────────────────────────────────────────
 
@@ -261,7 +439,7 @@ if submitted and query.strip():
         t0 = time.perf_counter()
         state = run_graph_with_model(
             query.strip(),
-            model=cfg.llm.primary_model,
+            model=cfg.llm.model,
             top_k=cfg.retrieval.top_k,
             image_path=image_path,
             conversation_history=conv_history,
@@ -271,10 +449,21 @@ if submitted and query.strip():
     # Collect exercise demo images returned by the graph.
     image_paths = state.get("retrieved_image_context", []) or []
     show_images = bool(state.get("show_images", False))
-    valid_paths = [p for p in image_paths if p and Path(p).is_file()] if show_images else []
+    query_type = state.get("query_type", "")
+    image_uploaded = uploaded_file is not None
+    show_frames = _wants_movement_frames(query)
+    can_show_images = show_images and (query_type == QueryRoute.CROSS_MODAL.value or image_uploaded)
+    valid_paths_all = [p for p in image_paths if p and Path(p).is_file()] if can_show_images else []
+    valid_paths = valid_paths_all[:3] if show_frames else valid_paths_all[:1]
+    node_timings = state.get("node_timings", {}) or {}
+    tools_log = state.get("tool_calls_log", [])
+    response_metrics = {
+        "total_latency_ms": node_timings.get("total", latency_ms),
+        "tools_count": len(tools_log),
+    }
 
     # Build meta string for assistant message.
-    tools_str = " → ".join(state["tool_calls_log"]) if state["tool_calls_log"] else "—"
+    tools_str = " → ".join(tools_log) if tools_log else "—"
     meta = f'<p class="meta-strip">{latency_ms:.0f} ms &nbsp;·&nbsp; {tools_str}</p>'
 
     # Append assistant message.
@@ -283,6 +472,10 @@ if submitted and query.strip():
         "content": state["final_response"],
         "retrieved_images": valid_paths,
         "show_images": show_images,
+        "image_uploaded": image_uploaded,
+        "show_frames": show_frames,
+        "metrics": response_metrics,
+        "tool_calls_log": tools_log,
         "meta": meta,
         "state": {
             "retrieved_text_context": state.get("retrieved_text_context", []),
@@ -290,9 +483,14 @@ if submitted and query.strip():
             "progression_context": state.get("progression_context", []),
             "retrieved_image_context": state.get("retrieved_image_context", []),
             "show_images": show_images,
+            "query_type": query_type,
+            "matched_exercise_name": state.get("matched_exercise_name"),
+            "node_timings": node_timings,
         },
     })
 
     # Increment counter to clear the text input and file uploader on rerun.
     st.session_state.input_counter += 1
     st.rerun()
+
+_render_session_stats()

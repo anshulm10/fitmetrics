@@ -61,12 +61,15 @@ def _format_rows(raw: dict[str, Any], k: int) -> list[dict[str, Any]]:
     for i, (rid, doc, meta, dist) in enumerate(zip(ids, docs, metas, dists)):
         if i >= k:
             break
+        metadata = dict(meta or {})
+        if "exercise_name" not in metadata and metadata.get("exercise_label"):
+            metadata["exercise_name"] = metadata["exercise_label"]
         rows.append(
             {
                 "id": rid,
                 "score": 1.0 - float(dist),
                 "document": doc,
-                "metadata": meta,
+                "metadata": metadata,
             }
         )
     return rows
@@ -220,14 +223,14 @@ def search_similar_exercise_image(
     chroma_path: str | Path = cfg.chroma.persist_directory,
     embedder: ImageEmbedder | None = None,
 ) -> list[dict[str, Any]]:
-    """Retrieve similar exercise images from the *fitness_images* ChromaDB collection.
+    """Retrieve the best matching exercise image from the *fitness_images* collection.
 
     Parameters
     ----------
     image_path : str | Path
         Path to the query image file.
     top_k : int
-        Maximum number of results to return.
+        Ignored for image identification; this function returns only the best match.
     chroma_path : str | Path
         Filesystem path to the persistent ChromaDB directory.
     embedder : ImageEmbedder | None
@@ -243,5 +246,5 @@ def search_similar_exercise_image(
     col = client.get_or_create_collection(cfg.chroma.image_collection)
     emb = embedder or ImageEmbedder()
     q_vec = emb.embed_single_image(path)
-    raw = col.query(query_embeddings=[q_vec], n_results=top_k)
-    return _format_rows(raw, top_k)
+    raw = col.query(query_embeddings=[q_vec], n_results=1)
+    return _format_rows(raw, 1)
