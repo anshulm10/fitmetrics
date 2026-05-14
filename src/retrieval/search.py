@@ -250,15 +250,14 @@ def search_similar_exercise_image(
     chroma_path: str | Path = cfg.chroma.persist_directory,
     embedder: ImageEmbedder | None = None,
 ) -> list[dict[str, Any]]:
-    """Retrieve the single best matching exercise image from *fitness_images*.
+    """Retrieve the top matching exercise images from *fitness_images*.
 
     Parameters
     ----------
     image_path : str | Path
         Path to the query image file.
     top_k : int
-        Ignored for image identification; this function always returns only the
-        highest-scoring match so generation uses one explicit exercise name.
+        Number of nearest neighbours to return (ranked by embedding distance).
     chroma_path : str | Path
         Filesystem path to the persistent ChromaDB directory.
     embedder : ImageEmbedder | None
@@ -274,5 +273,6 @@ def search_similar_exercise_image(
     col = client.get_or_create_collection(cfg.chroma.image_collection)
     emb = embedder or ImageEmbedder()
     q_vec = emb.embed_single_image(path)
-    raw = col.query(query_embeddings=[q_vec], n_results=1)
-    return _format_rows(raw, 1)
+    n = max(1, int(top_k))
+    raw = col.query(query_embeddings=[q_vec], n_results=n)
+    return _format_rows(raw, n)

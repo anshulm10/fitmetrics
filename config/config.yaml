@@ -12,9 +12,14 @@ chroma:
   persist_directory: data/chroma
 
 llm:
+  # Set model to qwen/quinn/quen/ollama to use local Ollama, or gemini to use
+  # the Gemini API. API keys belong in .env, never in this file.
+  model: qwen
   primary_model: qwen2.5:7b
   secondary_model: llama3.1:8b
   ollama_base_url: http://localhost:11434
+  gemini_model: gemini-2.5-flash
+  gemini_api_key_env: GEMINI_API_KEY
 
 evaluation:
   random_seed: 42

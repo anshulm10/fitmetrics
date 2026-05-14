@@ -208,8 +208,10 @@ class FitnessToolRouter:
         if routed.route == QueryRoute.FACTUAL_RETRIEVAL:
             results.append(self.text.run(query, top_k=top_k))
         elif routed.route == QueryRoute.CROSS_MODAL:
-            results.append(self.text.run(query, top_k=top_k))
+            # Image matches first so merged top-k is visually grounded; text alone
+            # often misses "what exercise is shown" phrasing.
             results.append(self.image.run(image_path, top_k=top_k))
+            results.append(self.text.run(query, top_k=top_k))
         elif routed.route == QueryRoute.ANALYTICAL:
             results.append(self.strength.run(query, top_k=top_k))
             results.append(self.text.run(query, top_k=top_k))

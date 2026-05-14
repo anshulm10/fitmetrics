@@ -10,7 +10,7 @@ results to data/eval/results.csv:
   4. ablation_no_injury         — full agent with injury_lookup node disabled
 
 Metrics per query × condition:
-  - recall_at_k            Recall@3 against expected exercises
+  - recall_at_k            Recall@3 against relevant_ids
   - mrr                    Mean Reciprocal Rank
   - personalization_score  1–5 rubric based on record types used
   - relevance_score        1–5 rubric based on recall
@@ -18,6 +18,12 @@ Metrics per query × condition:
                            to retrieved context (exercise names cited)
   - latency_ms             Wall-clock retrieval time
   - tool_calls_count       Number of tools fired (from AgentState.tool_calls_log)
+
+Per-family metrics reported:
+  - factual_retrieval       : avg Recall@3, avg MRR
+  - cross_modal             : avg Recall@3, avg MRR
+  - analytical              : avg Relevance, avg Personalization
+  - personalized_followup   : avg Relevance, avg Personalization
 
 LLM-as-judge prompt (groundedness dimension):
   Score 3 — Groundedness (1-5):
@@ -52,7 +58,38 @@ from src.config import cfg
 from src.embeddings.image_embedder import ImageEmbedder
 from src.embeddings.index_builder import build_indexes
 from src.embeddings.text_embedder import TextEmbedder
-from src.retrieval.search import search_exercise_by_text
+from src.retrieval.search import search_exercise_by_text, search_similar_exercise_image
+
+
+# ── constants ──────────────────────────────────────────────────────────────────
+
+DISPLAY_ORDER = [
+    "plain_llm_baseline",
+    "text_only_retrieval",
+    "full_multimodal_agent",
+    "ablation_no_injury",
+]
+
+FAMILY_ORDER = [
+    "factual_retrieval",
+    "cross_modal",
+    "analytical",
+    "personalized_followup",
+]
+
+_FAMILY_PRIMARY_METRIC = {
+    "factual_retrieval": "recall_at_k",
+    "cross_modal": "recall_at_k",
+    "analytical": "relevance_score",
+    "personalized_followup": "relevance_score",
+}
+
+_FAMILY_FAIL_REASON = {
+    "factual_retrieval": "no retrieval means no personal data",
+    "cross_modal": "text-only misses visual patterns",
+    "analytical": "multi-hop needs full tool stack",
+    "personalized_followup": "injury context critical for safety advice",
+}
 
 
 # ── data helpers ───────────────────────────────────────────────────────────────
@@ -63,8 +100,39 @@ def _load_benchmark(path: Path) -> list[dict[str, Any]]:
 
 
 def _norm(name: str) -> str:
-    """Normalise an exercise name for fuzzy comparison."""
+    """Normalise an exercise name or ID for fuzzy comparison."""
     return " ".join(str(name).lower().replace("_", " ").replace("-", " ").split())
+
+
+def _resolve_benchmark_image_path(image_path: str | Path | None) -> Path | None:
+    """Return an absolute path to the image if it exists under ROOT."""
+    if not image_path:
+        return None
+    p = Path(image_path)
+    if not p.is_absolute():
+        p = ROOT / p
+    return p if p.is_file() else None
+
+
+def _merge_recall_records(
+    primary: list[dict[str, Any]],
+    secondary: list[dict[str, Any]],
+    *,
+    limit: int,
+) -> list[dict[str, Any]]:
+    """Concatenate *primary* then *secondary*, dedupe by record ``id``, cap at *limit*."""
+    merged: list[dict[str, Any]] = []
+    seen: set[str] = set()
+    for r in primary + secondary:
+        key = str(r.get("id", ""))
+        if key and key in seen:
+            continue
+        if key:
+            seen.add(key)
+        merged.append(r)
+        if len(merged) >= limit:
+            break
+    return merged
 
 
 def _exercise_from_record(record: dict[str, Any]) -> str:
@@ -84,14 +152,14 @@ def _exercise_from_record(record: dict[str, Any]) -> str:
 # ── metrics ────────────────────────────────────────────────────────────────────
 
 def recall_at_k(records: list[dict[str, Any]], expected: list[str], k: int = cfg.retrieval.recall_k) -> float:
-    """Compute Recall@k: fraction of expected exercises found in top-k retrieved.
+    """Compute Recall@k: fraction of expected IDs found in top-k retrieved.
 
     Parameters
     ----------
     records : list[dict]
         Retrieved records ordered by relevance score.
     expected : list[str]
-        Ground-truth exercise names.
+        Ground-truth IDs or exercise names (e.g. "hack_squat", "INJ_001").
     k : int
         Cutoff rank.
     """
@@ -100,7 +168,8 @@ def recall_at_k(records: list[dict[str, Any]], expected: list[str], k: int = cfg
         return 0.0
     retrieved = [_norm(_exercise_from_record(r)) for r in records[:k]]
     hits = sum(1 for item in retrieved if item in expected_norm)
-    return hits / min(k, len(expected_norm))
+    raw = hits / min(k, len(expected_norm))
+    return min(1.0, raw)
 
 
 def mean_reciprocal_rank(relevant_ids: list[str], retrieved_ids: list[str]) -> float:
@@ -259,11 +328,14 @@ def _evaluate_variant(
     item: dict[str, Any],
     tool_router: FitnessToolRouter,
     text_embedder: TextEmbedder,
+    image_embedder: ImageEmbedder | None = None,
     model: str | None = None,
 ) -> dict[str, Any]:
     """Evaluate one (benchmark item, variant) pair and return a result row dict."""
     query = str(item["query"])
-    expected = list(item.get("expected_exercises", []))
+    # Support both new format (query_id / relevant_ids) and legacy (id / expected_exercises)
+    query_id = item.get("query_id", item.get("id", "unknown"))
+    expected = list(item.get("relevant_ids", item.get("expected_exercises", [])))
     category = str(item.get("category", ""))
     image_path = item.get("image_path")
     route = None
@@ -283,6 +355,18 @@ def _evaluate_variant(
             embedder=text_embedder,
         )
         tool_calls_count = 1
+        if category == "cross_modal" and image_embedder is not None:
+            img_path = _resolve_benchmark_image_path(image_path)
+            if img_path is not None:
+                img_recs = search_similar_exercise_image(
+                    img_path,
+                    top_k=cfg.retrieval.top_k,
+                    chroma_path=cfg.chroma.persist_path,
+                    embedder=image_embedder,
+                )
+                cap = max(cfg.retrieval.top_k, 3) * 3
+                records = _merge_recall_records(img_recs, records, limit=cap)
+                tool_calls_count = 2
 
     elif variant == "full_multimodal_agent":
         if model is not None:
@@ -310,12 +394,12 @@ def _evaluate_variant(
     retrieved_norm = [_norm(n) for n in retrieved_names]
 
     return {
-        "query_id": item["id"],
+        "query_id": query_id,
         "category": category,
         "system_name": variant,
         "query_type": route or QueryRouter().route(query, image_path=image_path).route.value,
         "query": query,
-        "expected_exercises": "|".join(expected),
+        "relevant_ids": "|".join(expected),
         "retrieved_top3": "|".join(retrieved_names),
         "recall_at_k": round(recall_at_k(records, expected), 4),
         "mrr": round(mean_reciprocal_rank(expected_norm, retrieved_norm), 4),
@@ -325,9 +409,96 @@ def _evaluate_variant(
         "latency_ms": round(latency_ms, 2),
         "tool_calls_count": tool_calls_count,
         "final_response": final_response,
-        "model": model or cfg.llm.primary_model,
+        "model": model or cfg.llm.active_model_name,
     }
 
+
+# ── per-family reporting ───────────────────────────────────────────────────────
+
+def compute_family_breakdown(df: pd.DataFrame) -> pd.DataFrame:
+    """Compute per-family average metrics grouped by (category, system_name)."""
+    metric_cols = [
+        "recall_at_k", "mrr", "relevance_score", "personalization_score",
+        "groundedness_score", "latency_ms",
+    ]
+    available = [c for c in metric_cols if c in df.columns]
+    family_df = (
+        df.groupby(["category", "system_name"])[available]
+        .mean()
+        .round(3)
+        .reset_index()
+    )
+    return family_df
+
+
+def print_family_table(df: pd.DataFrame) -> None:
+    """Print per-family breakdown table and per-family analysis notes."""
+    fam_w, sys_w, num_w = 24, 24, 16
+
+    header = (
+        f"{'Query Family':<{fam_w}}"
+        f"{'System':<{sys_w}}"
+        f"{'Recall@3':>{num_w}}"
+        f"{'MRR':>{num_w}}"
+        f"{'Relevance':>{num_w}}"
+        f"{'Personalization':>{num_w}}"
+    )
+    sep = "-" * (fam_w + sys_w + num_w * 4)
+
+    print()
+    print(header)
+    print(sep)
+
+    family_df = compute_family_breakdown(df)
+
+    all_families = list(FAMILY_ORDER) + [
+        f for f in family_df["category"].unique() if f not in FAMILY_ORDER
+    ]
+    present_families = [f for f in all_families if f in family_df["category"].values]
+
+    for fam in present_families:
+        fam_rows = family_df[family_df["category"] == fam]
+        printed_any = False
+        for sys_name in DISPLAY_ORDER:
+            row = fam_rows[fam_rows["system_name"] == sys_name]
+            if row.empty:
+                continue
+            r = row.iloc[0]
+            print(
+                f"{fam:<{fam_w}}"
+                f"{sys_name:<{sys_w}}"
+                f"{r.get('recall_at_k', 0.0):>{num_w}.3f}"
+                f"{r.get('mrr', 0.0):>{num_w}.3f}"
+                f"{r.get('relevance_score', 0.0):>{num_w}.3f}"
+                f"{r.get('personalization_score', 0.0):>{num_w}.3f}"
+            )
+            printed_any = True
+        if printed_any:
+            print()
+
+    # Analysis notes: best vs worst system per family
+    print("[EVAL] Per-family analysis:")
+    for fam in present_families:
+        fam_rows = family_df[family_df["category"] == fam]
+        if fam_rows.empty:
+            continue
+        primary = _FAMILY_PRIMARY_METRIC.get(fam, "recall_at_k")
+        if primary not in fam_rows.columns:
+            continue
+        best_row = fam_rows.loc[fam_rows[primary].idxmax()]
+        worst_row = fam_rows.loc[fam_rows[primary].idxmin()]
+        best_sys = best_row["system_name"]
+        best_score = best_row[primary]
+        worst_sys = worst_row["system_name"]
+        worst_score = worst_row[primary]
+        fail_reason = _FAMILY_FAIL_REASON.get(fam, "limited context")
+        print(
+            f"  {fam}: {best_sys} best ({best_score:.3f}), "
+            f"{worst_sys} fails ({worst_score:.3f}) — {fail_reason}"
+        )
+
+
+# ── main run ───────────────────────────────────────────────────────────────────
 
 def run_evaluation(
     benchmark_path: Path | None = None,
@@ -347,8 +518,8 @@ def run_evaluation(
     rebuild_index : bool
         When True, rebuilds the Chroma index before evaluation.
     model : str | None
-        Ollama model tag for generation nodes (e.g. "llama3.1:8b" or
-        "qwen2.5:7b"). None falls back to cfg.llm.primary_model.
+        Provider model tag for generation nodes (e.g. "llama3.1:8b",
+        "qwen2.5:7b", or "gemini"). None falls back to the configured LLM.
     """
     benchmark_path = benchmark_path or ROOT / "tests/benchmark_queries.json"
     results_path = results_path or cfg.evaluation.results_file
@@ -358,7 +529,7 @@ def run_evaluation(
         print("[EVAL] rebuilding Chroma indexes before evaluation")
         build_indexes()
 
-    _model_label = model or cfg.llm.primary_model
+    _model_label = model or cfg.llm.active_model_name
     print(f"[EVAL] running with model={_model_label}")
 
     benchmark = _load_benchmark(benchmark_path)
@@ -382,6 +553,7 @@ def run_evaluation(
                     item=item,
                     tool_router=router,
                     text_embedder=text_embedder,
+                    image_embedder=image_embedder,
                     model=model,
                 )
             )
@@ -390,14 +562,27 @@ def run_evaluation(
     df.to_csv(results_path, index=False)
     print(f"[EVAL] wrote {results_path} rows={len(df)}")
 
+    # Per-family breakdown CSV
+    family_df = compute_family_breakdown(df)
+    family_results_path = results_path.parent / "family_results.csv"
+    family_df.to_csv(family_results_path, index=False)
+    print(f"[EVAL] wrote {family_results_path}")
+
+    # Overall system-level summary
     summary_cols = [
         "recall_at_k", "mrr", "relevance_score",
         "personalization_score", "groundedness_score",
         "latency_ms", "tool_calls_count",
     ]
-    summary = df.groupby("system_name")[summary_cols].mean().round(3)
-    print("[EVAL] summary")
+    available_cols = [c for c in summary_cols if c in df.columns]
+    summary = df.groupby("system_name")[available_cols].mean().round(3)
+    print("\n[EVAL] overall system summary (all families combined)")
     print(summary.to_string())
+
+    # Per-family table
+    print("\n[EVAL] per-family breakdown")
+    print_family_table(df)
+
     return df
 
 

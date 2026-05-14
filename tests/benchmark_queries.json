@@ -1,72 +1,52 @@
 [
   {
-    "id": "factual_001",
+    "query_id": "factual_001",
     "category": "factual_retrieval",
-    "query": "upper chest press",
-    "expected_exercises": ["Incline Chest Press Machine", "Dumbbell Incline Bench Press", "Barbell Bench Press"]
+    "query": "what is my best weight on hack squat?",
+    "relevant_ids": ["hack_squat"]
   },
   {
-    "id": "factual_002",
+    "query_id": "factual_002",
     "category": "factual_retrieval",
-    "query": "lat focused back movement",
-    "expected_exercises": ["Lat Pulldown", "Pull Ups", "Bent Over Row", "Seated Cable Row"]
+    "query": "what muscles does lat pulldown work?",
+    "relevant_ids": ["lat_pulldown"]
   },
   {
-    "id": "factual_003",
-    "category": "factual_retrieval",
-    "query": "machine quad isolation exercise",
-    "expected_exercises": ["Leg Extension", "Leg Press", "Hack Squat"]
-  },
-  {
-    "id": "cross_001",
+    "query_id": "cross_modal_001",
     "category": "cross_modal",
-    "query": "find exercise images similar to this bent over row photo",
-    "image_path": "data/raw/images/bent_over_row/finish.jpeg",
-    "expected_exercises": ["Bent Over Row"]
+    "query": "what exercise is shown in this image and what is my best on it?",
+    "image_path": "data/raw/images/hack_squat/mid.jpeg",
+    "relevant_ids": ["hack_squat"]
   },
   {
-    "id": "cross_002",
+    "query_id": "cross_modal_002",
     "category": "cross_modal",
-    "query": "match this leg press image to the correct exercise",
-    "image_path": "data/raw/images/leg_press/start.jpeg",
-    "expected_exercises": ["Leg Press"]
+    "query": "show me exercises similar to this movement",
+    "image_path": "data/raw/images/cable_row/mid.jpeg",
+    "relevant_ids": ["cable_row", "lat_pulldown", "seated_cable_row"]
   },
   {
-    "id": "cross_003",
-    "category": "cross_modal",
-    "query": "what exercise does this cable curl image look like",
-    "image_path": "data/raw/images/cable_bicep_curl/mid.jpeg",
-    "expected_exercises": ["Cable Bicep Curl"]
-  },
-  {
-    "id": "analytical_001",
+    "query_id": "analytical_001",
     "category": "analytical",
-    "query": "analyze my strongest lower body baseline lifts",
-    "expected_exercises": ["Leg Press", "Hip Thrust", "Hack Squat", "Back Squat"]
+    "query": "my hack squat has plateaued at 140kg and my knee is sore, what should I change about leg training this week?",
+    "relevant_ids": ["hack_squat", "INJ_001", "leg_press"]
   },
   {
-    "id": "analytical_002",
+    "query_id": "analytical_002",
     "category": "analytical",
-    "query": "compare my press strength baselines",
-    "expected_exercises": ["Barbell Bench Press", "Dumbbell Flat Bench Press", "Dumbbell Shoulder Press"]
+    "query": "looking at my pushing movements, which muscle groups am I neglecting and what should I add?",
+    "relevant_ids": ["dumbbell_shoulder_press", "incline_chest_press", "lateral_raise"]
   },
   {
-    "id": "personal_001",
+    "query_id": "personal_001",
     "category": "personalized_followup",
-    "query": "recommend a knee friendly quad exercise for me",
-    "expected_exercises": ["Hack Squat", "Leg Press", "Leg Extension"]
+    "query": "I did hack squat and leg press today, what should I do next given my knee history?",
+    "relevant_ids": ["hack_squat", "leg_press", "dumbbell_shoulder_press"]
   },
   {
-    "id": "personal_002",
+    "query_id": "personal_002",
     "category": "personalized_followup",
-    "query": "given my bodyweight pull up baseline, what back movement should I focus on",
-    "expected_exercises": ["Pull Ups", "Lat Pulldown", "Seated Cable Row"]
-  },
-  {
-    "id": "personal_003",
-    "category": "personalized_followup",
-    "query": "what glute exercise fits my current strength profile",
-    "expected_exercises": ["Hip Thrust", "Romanian Deadlift", "Leg Press"]
+    "query": "considering my shoulder and knee issues, what is a safe full body workout for today?",
+    "relevant_ids": ["dumbbell_shoulder_press", "chest_supported_row", "dumbbell_flat_bench_press"]
   }
 ]
-

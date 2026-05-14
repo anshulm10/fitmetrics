@@ -150,13 +150,10 @@ if "messages" not in st.session_state:
     st.session_state.messages = []
 if "input_counter" not in st.session_state:
     st.session_state.input_counter = 0
-# Persist the last uploaded image across turns so follow-up questions still
-# have image context even after the file uploader is cleared on rerun.
 if "last_image_bytes" not in st.session_state:
     st.session_state.last_image_bytes = None
 if "last_image_suffix" not in st.session_state:
     st.session_state.last_image_suffix = ".jpg"
-
 
 def _format_ms(ms: float | int | None) -> str:
     if ms is None:
@@ -240,6 +237,37 @@ def _short_progression(items: list[str], limit: int = 2) -> str:
 def _wants_movement_frames(query: str) -> bool:
     q = query.lower()
     return "show me the movement" in q or "show me the frames" in q
+
+
+def _graph_query_for_greeting_policy(query: str, image_path: str | None) -> str:
+    if image_path is not None:
+        return query
+    normalized = re.sub(r"[!?.\s]+", " ", query.lower()).strip()
+    if normalized == "help":
+        return "what can you do"
+    if normalized in {"hi", "hello", "hey", "what can you do"}:
+        return query
+    blocked_intro_terms = {
+        "yo",
+        "sup",
+        "hola",
+        "howdy",
+        "greetings",
+        "good morning",
+        "good afternoon",
+        "good evening",
+        "good day",
+        "who are you",
+        "what are you",
+        "how do you work",
+        "how can you help",
+        "what do you do",
+        "introduce yourself",
+        "tell me about yourself",
+    }
+    if normalized in blocked_intro_terms:
+        return f"Answer directly without the introduction: {query}"
+    return query
 
 
 def _render_metrics_bar(msg: dict) -> None:
@@ -403,9 +431,10 @@ if submitted and not query.strip():
 
 if submitted and query.strip():
     # Resolve image: prefer freshly uploaded file, fall back to persisted bytes.
+    user_query = query.strip()
     image_path: str | None = None
     image_bytes_for_history: bytes | None = None
-    is_visual_query = QueryRouter().route(query.strip()).route == QueryRoute.CROSS_MODAL
+    is_visual_query = QueryRouter().route(user_query).route == QueryRoute.CROSS_MODAL
 
     if uploaded_file is not None:
         suffix = Path(uploaded_file.name).suffix or ".jpg"
@@ -423,6 +452,8 @@ if submitted and query.strip():
             tmp.write(st.session_state.last_image_bytes)
             image_path = tmp.name
 
+    graph_query = _graph_query_for_greeting_policy(user_query, image_path)
+
     # Build conversation history from the last 3 exchanges (6 messages).
     recent = st.session_state.messages[-6:]
     conv_history = [{"role": m["role"], "content": m["content"]} for m in recent]
@@ -431,14 +462,14 @@ if submitted and query.strip():
     # Append user message to history immediately so it shows on rerun.
     st.session_state.messages.append({
         "role": "user",
-        "content": query.strip(),
+        "content": user_query,
         "image_bytes": image_bytes_for_history,
     })
 
     with st.spinner("Thinking…"):
         t0 = time.perf_counter()
         state = run_graph_with_model(
-            query.strip(),
+            graph_query,
             model=cfg.llm.model,
             top_k=cfg.retrieval.top_k,
             image_path=image_path,
@@ -451,7 +482,7 @@ if submitted and query.strip():
     show_images = bool(state.get("show_images", False))
     query_type = state.get("query_type", "")
     image_uploaded = uploaded_file is not None
-    show_frames = _wants_movement_frames(query)
+    show_frames = _wants_movement_frames(user_query)
     can_show_images = show_images and (query_type == QueryRoute.CROSS_MODAL.value or image_uploaded)
     valid_paths_all = [p for p in image_paths if p and Path(p).is_file()] if can_show_images else []
     valid_paths = valid_paths_all[:3] if show_frames else valid_paths_all[:1]

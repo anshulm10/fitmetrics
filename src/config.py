@@ -63,11 +63,31 @@ class ChromaConfig:
 
 @dataclass(frozen=True)
 class LLMConfig:
-    """LLM model names and Ollama endpoint."""
+    """LLM provider selector, model names, and provider endpoints."""
 
     primary_model: str
     secondary_model: str
     ollama_base_url: str
+    model: str = "qwen"
+    gemini_model: str = "gemini-2.5-flash"
+    gemini_api_key_env: str = "GEMINI_API_KEY"
+
+    @property
+    def provider(self) -> str:
+        """Return the provider implied by the logical model selector."""
+        selector = self.model.strip().lower()
+        if selector in {"gemini", "google", "google-gemini"}:
+            return "gemini"
+        if selector in {"qwen", "quen", "quinn", "ollama", "local"}:
+            return "ollama"
+        if selector.startswith("gemini"):
+            return "gemini"
+        return "ollama"
+
+    @property
+    def active_model_name(self) -> str:
+        """Return the concrete provider model configured for generation."""
+        return self.gemini_model if self.provider == "gemini" else self.primary_model
 
 
 @dataclass(frozen=True)

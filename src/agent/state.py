@@ -31,6 +31,9 @@ class AgentState(TypedDict):
         Whether the UI should render image results for this turn.
     matched_exercise_name : Optional[str]
         Exercise name matched from an uploaded image (only when CLIP confidence >= 0.25).
+    exercise_confidence : Optional[float]
+        CLIP zero-shot classification confidence [0, 1] for the matched exercise.
+        None when no image was uploaded or the fallback image-embedding path was used.
     image_identification_note : Optional[str]
         Set by image_retrieval_node when CLIP confidence is too low to trust the match.
         Contains the "could not confidently identify" message passed to generation.
@@ -58,6 +61,7 @@ class AgentState(TypedDict):
     retrieved_image_context: Annotated[List[str], operator.add]
     show_images: bool
     matched_exercise_name: Optional[str]
+    exercise_confidence: Optional[float]
     image_identification_note: Optional[str]
     node_timings: Annotated[Dict[str, float], operator.or_]
     recall_at_3: Optional[float]

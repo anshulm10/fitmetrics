@@ -43,6 +43,10 @@ from src.agent.router import QueryRoute, QueryRouter
 from src.agent.state import AgentState
 from src.agent.tools import InjuryMemoryTool, StrengthProgressionTool
 from src.config import cfg, user_profile
+from src.retrieval.clip_classifier import (
+    NN_EXACT_MATCH_THRESHOLD,
+    classify_exercise as _clip_classify,
+)
 from src.retrieval.search import (
     _client as _chroma_client,
     get_images_by_exercise_label,
@@ -424,12 +428,35 @@ def _build_user_prompt(state: AgentState) -> str:
     image_context = state.get("retrieved_image_context", []) if state.get("show_images") else []
     matched_exercise_name = (state.get("matched_exercise_name") or "").strip()
 
+    # Known working weights derived from the user's lift history — used as
+    # additional context when ChromaDB returns no progression records for the
+    # identified exercise (e.g. due to name mismatches between image labels
+    # and lift-record exercise names).
+    _KNOWN_WEIGHTS: dict[str, int] = {
+        "Hack Squat": 140,
+        "Leg Press": 230,
+        "Hip Thrust": 160,
+        "Barbell Squat": 105,
+        "Dead Lift": 80,
+        "Bench Press": 35,
+        "Incline Machine Press": 30,
+        "Lat Pulldown": 72,
+    }
+
     if matched_exercise_name:
+        confidence = state.get("exercise_confidence")
+        conf_str = f" (confidence: {confidence:.0%})" if confidence is not None else ""
         parts.append(
-            "The uploaded image was matched to: "
-            f"{matched_exercise_name} in the user's exercise library. "
-            "Use this exact name when responding — do not guess a different exercise."
+            f"The user uploaded an image. Based on visual analysis, they appear to be "
+            f"performing: {matched_exercise_name}{conf_str}. "
+            "Use this exact exercise name when responding — do not guess a different exercise."
         )
+        # Inject known working weight when progression_context won't cover it
+        known_weight = _KNOWN_WEIGHTS.get(matched_exercise_name)
+        if known_weight is not None and not (state.get("progression_context") or []):
+            parts.append(
+                f"User's current working weight for {matched_exercise_name}: {known_weight} kg."
+            )
 
     # Progression context — use targeted data when an exercise was image-identified.
     # If the image was identified but no lift records exist, tell the LLM explicitly.
@@ -533,24 +560,33 @@ def text_retrieval_node(state: AgentState) -> dict:
 
 
 def image_retrieval_node(state: AgentState) -> dict:
-    """Retrieve similar exercise images via CLIP embedding search against fitness_images."""
+    """Identify the exercise in an uploaded image, then retrieve matching docs.
+
+    New flow (CLIP zero-shot classification):
+      1. Run clip_classifier.classify_exercise() on the uploaded image.
+      2. If confidence >= 0.25:
+           - Fetch demo images from ChromaDB by exact exercise_label match.
+           - Fetch exercise text docs by exercise name for generation context.
+           - Store matched_exercise_name + exercise_confidence in state so
+             context_fusion_node can do a targeted lift-record lookup.
+      3. If confidence < 0.25:
+           - Fall back to the original image-embedding nearest-neighbour search.
+
+    When no image is uploaded the node falls back to a text-based image lookup.
+    """
     t0 = time.perf_counter()
     image_path = state.get("image_path")
+
+    # ── No image uploaded: look up demo images for the query text ─────────────
     if not image_path:
-        records = search_exercise_by_text(
-            state["query"],
-            top_k=1,
-            chroma_path=_CHROMA_PATH,
-        )
+        records = search_exercise_by_text(state["query"], top_k=1, chroma_path=_CHROMA_PATH)
         image_docs: list[str] = []
         for rec in records:
             exercise_name = str((rec.get("metadata") or {}).get("exercise_name", "")).strip()
             if not exercise_name:
                 continue
-            image_records = get_images_by_exercise_label(
-                exercise_name, chroma_path=_CHROMA_PATH, limit=3
-            )
-            image_docs.extend(_extract_docs(image_records))
+            img_recs = get_images_by_exercise_label(exercise_name, chroma_path=_CHROMA_PATH, limit=3)
+            image_docs.extend(_extract_docs(img_recs))
             break
         return {
             "retrieved_image_context": image_docs,
@@ -558,6 +594,7 @@ def image_retrieval_node(state: AgentState) -> dict:
             "node_timings": {"image_retrieval": (time.perf_counter() - t0) * 1000},
             "tool_calls_log": ["image_retrieval"],
         }
+
     path = Path(image_path)
     if not path.is_absolute():
         path = ROOT / path
@@ -568,17 +605,82 @@ def image_retrieval_node(state: AgentState) -> dict:
             "node_timings": {"image_retrieval": (time.perf_counter() - t0) * 1000},
             "tool_calls_log": ["image_retrieval"],
         }
-    records = search_similar_exercise_image(
-        path, top_k=1, chroma_path=_CHROMA_PATH
-    )
 
-    _CLIP_CONFIDENCE_THRESHOLD = 0.25
+    _CONFIDENCE_THRESHOLD = 0.25
+
+    # ── Step 1a: NN image-embedding search (runs before CLIP to check for near-
+    # exact matches — e.g. user uploaded one of the indexed demo frames) ────────
+    nn_records = search_similar_exercise_image(path, top_k=1, chroma_path=_CHROMA_PATH)
+    if nn_records:
+        nn_top = nn_records[0]
+        nn_score = float(nn_top.get("score", 0))
+        nn_meta = nn_top.get("metadata") or {}
+        nn_exercise = str(
+            nn_top.get("exercise_name")
+            or nn_meta.get("exercise_name")
+            or nn_meta.get("exercise_label")
+            or ""
+        ).strip()
+        if nn_score >= NN_EXACT_MATCH_THRESHOLD and nn_exercise:
+            # Near-exact image match — skip CLIP and trust the NN result directly.
+            # This handles the case where the user uploads an image that is
+            # essentially identical to an indexed demo frame.
+            img_recs = get_images_by_exercise_label(nn_exercise, chroma_path=_CHROMA_PATH, limit=3)
+            text_recs = search_exercise_by_text(nn_exercise, top_k=_get_top_k(), chroma_path=_CHROMA_PATH)
+            return {
+                "retrieved_text_context": _extract_docs(text_recs),
+                "retrieved_image_context": _extract_docs(img_recs),
+                "show_images": True,
+                "matched_exercise_name": nn_exercise,
+                "exercise_confidence": nn_score,
+                "image_identification_note": None,
+                "node_timings": {"image_retrieval": (time.perf_counter() - t0) * 1000},
+                "tool_calls_log": ["image_retrieval"],
+            }
+    else:
+        nn_score, nn_exercise = 0.0, ""
+
+    # ── Step 1b: CLIP zero-shot classification ─────────────────────────────────
+    try:
+        identified_exercise, confidence = _clip_classify(path)
+    except Exception as exc:  # noqa: BLE001
+        import logging as _logging
+        _logging.getLogger(__name__).warning(
+            "[image_retrieval] CLIP classifier failed (%s); falling back to embedding search", exc
+        )
+        identified_exercise, confidence = "", 0.0
+
+    # ── Step 2a: High-confidence CLIP path ────────────────────────────────────
+    if identified_exercise and confidence >= _CONFIDENCE_THRESHOLD:
+        # Fetch demo images by exact exercise_label (e.g. "Hack Squat")
+        img_recs = get_images_by_exercise_label(
+            identified_exercise, chroma_path=_CHROMA_PATH, limit=3
+        )
+        # Fetch exercise text docs so the generation node gets exercise details
+        text_recs = search_exercise_by_text(
+            identified_exercise, top_k=_get_top_k(), chroma_path=_CHROMA_PATH
+        )
+        return {
+            "retrieved_text_context": _extract_docs(text_recs),
+            "retrieved_image_context": _extract_docs(img_recs),
+            "show_images": True,
+            "matched_exercise_name": identified_exercise,
+            "exercise_confidence": confidence,
+            "image_identification_note": None,
+            "node_timings": {"image_retrieval": (time.perf_counter() - t0) * 1000},
+            "tool_calls_log": ["image_retrieval"],
+        }
+
+    # ── Step 2b: Low-confidence — fall back to image-embedding NN search ──────
+    # Reuse the nn_records already fetched in Step 1a.
+    records = nn_records if nn_records else search_similar_exercise_image(path, top_k=1, chroma_path=_CHROMA_PATH)
 
     if not records:
         return {
             "retrieved_image_context": [],
             "show_images": True,
             "matched_exercise_name": "",
+            "exercise_confidence": None,
             "image_identification_note": (
                 "The uploaded image could not be matched to any exercise in your library "
                 "(no results returned). Please describe the exercise or upload a clearer image."
@@ -588,24 +690,24 @@ def image_retrieval_node(state: AgentState) -> dict:
         }
 
     top = records[0]
-    score = float(top.get("score", 0))
+    fallback_score = float(top.get("score", 0))
     metadata = top.get("metadata") or {}
-    matched_exercise_name = str(
+    fallback_exercise = str(
         top.get("exercise_name")
         or metadata.get("exercise_name")
         or metadata.get("exercise_label")
         or ""
     ).strip()
 
-    if score < _CLIP_CONFIDENCE_THRESHOLD:
-        # Score too low to trust — tell generation not to guess
+    if fallback_score < _CONFIDENCE_THRESHOLD:
         return {
             "retrieved_image_context": [],
             "show_images": False,
             "matched_exercise_name": "",
+            "exercise_confidence": None,
             "image_identification_note": (
-                f"The uploaded image could not be confidently matched to any exercise "
-                f"in your library (confidence: {score:.2f}). "
+                f"The uploaded image could not be confidently identified "
+                f"(confidence: {max(confidence, fallback_score):.0%}). "
                 "Please describe the exercise or upload a clearer image."
             ),
             "node_timings": {"image_retrieval": (time.perf_counter() - t0) * 1000},
@@ -615,7 +717,8 @@ def image_retrieval_node(state: AgentState) -> dict:
     return {
         "retrieved_image_context": _extract_docs(records),
         "show_images": True,
-        "matched_exercise_name": matched_exercise_name,
+        "matched_exercise_name": fallback_exercise,
+        "exercise_confidence": None,
         "image_identification_note": None,
         "node_timings": {"image_retrieval": (time.perf_counter() - t0) * 1000},
         "tool_calls_log": ["image_retrieval"],
@@ -814,6 +917,7 @@ def run_graph(
         "retrieved_image_context": [],
         "show_images": False,
         "matched_exercise_name": None,
+        "exercise_confidence": None,
         "image_identification_note": None,
         "node_timings": {},
         "recall_at_3": None,
