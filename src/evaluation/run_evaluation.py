@@ -33,7 +33,7 @@ SRC = ROOT / "src"
 if str(SRC) not in sys.path:
     sys.path.insert(0, str(SRC))
 
-from agent.graph import run_graph
+from agent.graph import run_graph, run_graph_with_model
 from agent.router import QueryRouter
 from agent.tools import FitnessToolRouter
 from config import cfg
@@ -169,15 +169,19 @@ def _ablation_no_injury(
     query: str,
     image_path: str | None,
     tool_router: FitnessToolRouter,
-) -> tuple[list[dict[str, Any]], str, int]:
+    model: str | None = None,
+) -> tuple[list[dict[str, Any]], str, int, str]:
     """Run the full multimodal agent but strip injury_lookup records from results.
 
-    Returns (records, route, tool_calls_count).  The tool_calls_count still
-    reflects how many tools the graph tried to fire; injury records are simply
-    excluded from the returned context so the downstream scorer sees a world
-    without injury awareness.
+    Returns (records, route, tool_calls_count, final_response).  The
+    tool_calls_count still reflects how many tools the graph tried to fire;
+    injury records are simply excluded from the returned context so the
+    downstream scorer sees a world without injury awareness.
     """
-    state = run_graph(query, image_path=image_path)
+    if model is not None:
+        state = run_graph_with_model(query, model=model, image_path=image_path)
+    else:
+        state = run_graph(query, image_path=image_path)
     route = state["query_type"]
     tool_calls = len(state["tool_calls_log"])
 
@@ -186,7 +190,7 @@ def _ablation_no_injury(
         r for r in result["records"]
         if str((r.get("metadata") or {}).get("record_type", "")) != "injury_memory"
     ]
-    return records, route, tool_calls
+    return records, route, tool_calls, state.get("final_response", "")
 
 
 # ── main evaluator ─────────────────────────────────────────────────────────────
@@ -197,6 +201,7 @@ def _evaluate_variant(
     item: dict[str, Any],
     tool_router: FitnessToolRouter,
     text_embedder: TextEmbedder,
+    model: str | None = None,
 ) -> dict[str, Any]:
     """Evaluate one (benchmark item, variant) pair and return a result row dict."""
     query = str(item["query"])
@@ -205,6 +210,7 @@ def _evaluate_variant(
     image_path = item.get("image_path")
     route = None
     tool_calls_count = 0
+    final_response = ""
 
     start = time.perf_counter()
 
@@ -221,14 +227,20 @@ def _evaluate_variant(
         tool_calls_count = 1
 
     elif variant == "full_multimodal_agent":
-        state = run_graph(query, image_path=image_path)
+        if model is not None:
+            state = run_graph_with_model(query, model=model, image_path=image_path)
+        else:
+            state = run_graph(query, image_path=image_path)
         route = state["query_type"]
         tool_calls_count = len(state["tool_calls_log"])
+        final_response = state.get("final_response", "")
         result = tool_router.run(query, image_path=image_path, top_k=cfg.retrieval.top_k)
         records = list(result["records"])
 
     elif variant == "ablation_no_injury":
-        records, route, tool_calls_count = _ablation_no_injury(query, image_path, tool_router)
+        records, route, tool_calls_count, final_response = _ablation_no_injury(
+            query, image_path, tool_router, model=model
+        )
 
     else:
         raise ValueError(f"Unknown variant: {variant!r}")
@@ -253,6 +265,8 @@ def _evaluate_variant(
         "relevance_score": _response_relevance(records, expected),
         "latency_ms": round(latency_ms, 2),
         "tool_calls_count": tool_calls_count,
+        "final_response": final_response,
+        "model": model or cfg.llm.primary_model,
     }
 
 
@@ -261,6 +275,7 @@ def run_evaluation(
     results_path: Path | None = None,
     *,
     rebuild_index: bool = False,
+    model: str | None = None,
 ) -> pd.DataFrame:
     """Run all four evaluation conditions and write results to CSV.
 
@@ -272,6 +287,9 @@ def run_evaluation(
         Path for the output CSV; defaults to cfg.evaluation.results_file.
     rebuild_index : bool
         When True, rebuilds the Chroma index before evaluation.
+    model : str | None
+        Ollama model tag for generation nodes (e.g. "llama3.1:8b" or
+        "qwen2.5:7b"). None falls back to cfg.llm.primary_model.
     """
     benchmark_path = benchmark_path or ROOT / "tests/benchmark_queries.json"
     results_path = results_path or cfg.evaluation.results_file
@@ -280,6 +298,9 @@ def run_evaluation(
     if rebuild_index:
         print("[EVAL] rebuilding Chroma indexes before evaluation")
         build_indexes()
+
+    _model_label = model or cfg.llm.primary_model
+    print(f"[EVAL] running with model={_model_label}")
 
     benchmark = _load_benchmark(benchmark_path)
     text_embedder = TextEmbedder()
@@ -302,6 +323,7 @@ def run_evaluation(
                     item=item,
                     tool_router=router,
                     text_embedder=text_embedder,
+                    model=model,
                 )
             )
 
@@ -322,8 +344,14 @@ def main() -> None:
     parser.add_argument("--benchmark", type=Path, default=None)
     parser.add_argument("--results", type=Path, default=None)
     parser.add_argument("--rebuild-index", action="store_true")
+    parser.add_argument(
+        "--model",
+        type=str,
+        default=None,
+        help="Ollama model tag for generation (e.g. llama3.1:8b or qwen2.5:7b).",
+    )
     args = parser.parse_args()
-    run_evaluation(args.benchmark, args.results, rebuild_index=args.rebuild_index)
+    run_evaluation(args.benchmark, args.results, rebuild_index=args.rebuild_index, model=args.model)
 
 
 if __name__ == "__main__":

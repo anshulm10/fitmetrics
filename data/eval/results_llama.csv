@@ -1,0 +1,279 @@
+query_id,category,system_name,query_type,query,expected_exercises,retrieved_top3,recall_at_k,mrr,personalization_score,relevance_score,latency_ms,tool_calls_count,final_response,model
+factual_001,factual_retrieval,plain_llm_baseline,factual_retrieval,upper chest press,Incline Chest Press Machine|Dumbbell Incline Bench Press|Barbell Bench Press,Generic coaching advice for,0.0,0.0,1,2,0.0,0,,llama3.1:8b
+factual_001,factual_retrieval,text_only_retrieval,factual_retrieval,upper chest press,Incline Chest Press Machine|Dumbbell Incline Bench Press|Barbell Bench Press,Chest Press Machine|Incline Chest Press Machine|Military Press,0.3333,0.5,3,3,145.65,1,,llama3.1:8b
+factual_001,factual_retrieval,full_multimodal_agent,factual_retrieval,upper chest press,Incline Chest Press Machine|Dumbbell Incline Bench Press|Barbell Bench Press,Chest Press Machine|Incline Chest Press Machine|Military Press,0.3333,0.5,3,3,21424.22,4,"Given your request for the upper chest press and considering our available exercises, I recommend performing the Incline Chest Press Machine.
+
+This exercise specifically targets the upper chest muscle group, which aligns with your interest in the upper chest press. It's also a machine-based exercise, which can provide more control over the movement pattern and help maintain proper form, especially since it involves an incline push that naturally places less stress on the lower back compared to some free weight exercises.
+
+Remember to set the seat and handles to align with your joint path as advised by our coaching cues. This will ensure you're working the muscles effectively while also minimizing any potential strain or discomfort.",llama3.1:8b
+factual_001,factual_retrieval,ablation_no_injury,factual_retrieval,upper chest press,Incline Chest Press Machine|Dumbbell Incline Bench Press|Barbell Bench Press,Chest Press Machine|Incline Chest Press Machine|Military Press,0.3333,0.5,3,3,22489.43,4,"Based on your query, I recommend performing the Incline Chest Press Machine exercise to target your upper chest muscles.
+
+This exercise is specifically designed for targeting the upper chest, and given that you're looking at the upper chest press, it's a great fit. Additionally, since there are no injury flags and we have a clear progression data available (none), we can proceed with this recommendation without any modifications or concerns.
+
+To execute this exercise effectively:
+
+1. Ensure the seat and handles are aligned to facilitate a smooth joint path.
+2. Select a weight that allows you to complete the given number of sets with proper form.
+3. Focus on squeezing your upper chest muscles as you press the handle upwards.
+4. Take note of your execution, making sure to maintain control throughout the entire range of motion.
+
+Remember to follow through with proper form and technique to maximize the benefits from this exercise. Let's monitor your progress and adjust as needed in future sessions!",llama3.1:8b
+factual_002,factual_retrieval,plain_llm_baseline,factual_retrieval,lat focused back movement,Lat Pulldown|Pull Ups|Bent Over Row|Seated Cable Row,Generic coaching advice for,0.0,0.0,1,2,0.0,0,,llama3.1:8b
+factual_002,factual_retrieval,text_only_retrieval,factual_retrieval,lat focused back movement,Lat Pulldown|Pull Ups|Bent Over Row|Seated Cable Row,Lat Pulldown|Machine Row|Lat Pulldown,0.6667,1.0,3,4,16.52,1,,llama3.1:8b
+factual_002,factual_retrieval,full_multimodal_agent,factual_retrieval,lat focused back movement,Lat Pulldown|Pull Ups|Bent Over Row|Seated Cable Row,Lat Pulldown|Machine Row|Lat Pulldown,0.6667,1.0,3,4,20611.49,4,"Based on your workout history and the exercises provided, I recommend increasing the weight you're using for Lat Pulldowns to challenge yourself beyond your current personal baseline of 72kg.
+
+To do this, aim to pull the bar down to your chest or slightly below, squeezing your lats at the peak contraction. This will help ensure you're targeting the lat muscles effectively.
+
+Also, revisit Machine Row as an alternative exercise, especially if you've noticed a plateau in Lat Pulldowns. Set the seat and handles so that they align with your joint path as recommended, focusing on proper form to engage both your lats and rhomboids.
+
+Remember to monitor your body's response and adjust your approach as needed.",llama3.1:8b
+factual_002,factual_retrieval,ablation_no_injury,factual_retrieval,lat focused back movement,Lat Pulldown|Pull Ups|Bent Over Row|Seated Cable Row,Lat Pulldown|Machine Row|Lat Pulldown,0.6667,1.0,3,4,20670.26,4,"Based on your lat-focused back movement requirements and retrieved exercises, I recommend:
+
+**Lat Pulldown**: Given your previous success with this exercise (best weight 72kg, best reps 6), it's an ideal choice to target your lats effectively. To take it up a notch, aim for an additional 5-8% increase in weight or reps compared to your personal baseline.
+
+**Coaching cues**:
+1. Focus on squeezing your lats at the peak of the movement.
+2. Maintain proper posture with your back straight and core engaged throughout the exercise.
+3. Pull the bar down to your chest, avoiding jerky movements.
+
+This exercise should help you maintain or improve your lat strength while also engaging your rhomboids for a comprehensive back workout.",llama3.1:8b
+factual_003,factual_retrieval,plain_llm_baseline,factual_retrieval,machine quad isolation exercise,Leg Extension|Leg Press|Hack Squat,Generic coaching advice for,0.0,0.0,1,2,0.0,0,,llama3.1:8b
+factual_003,factual_retrieval,text_only_retrieval,factual_retrieval,machine quad isolation exercise,Leg Extension|Leg Press|Hack Squat,Ab Crunch Machine|Machine Row|Rear Delt Fly Machine,0.0,0.0,3,2,18.5,1,,llama3.1:8b
+factual_003,factual_retrieval,full_multimodal_agent,factual_retrieval,machine quad isolation exercise,Leg Extension|Leg Press|Hack Squat,Ab Crunch Machine|Machine Row|Rear Delt Fly Machine,0.0,0.0,3,2,23017.97,4,"Since you're looking for a machine-based quad isolation exercise, I'll focus on exercises that target the quadriceps muscles while minimizing stress on other joints.
+
+Considering your available equipment and previous workouts, I recommend:
+
+**Leg Extension Machine**
+
+* Muscle groups targeted: Quadriceps (specifically, Rectus Femoris)
+* Equipment: Machine
+* Movement pattern: Knee Extension
+
+To perform this exercise safely and effectively:
+1. Adjust the machine to align your knee path with the weight stack.
+2. Lift the weight up by straightening your knees, then slowly lower it back down.
+3. Focus on squeezing your quadriceps muscles at the top of the movement.
+
+As you're not injured and have no progression data to consider, this exercise provides a great opportunity to isolate your quadriceps muscles with control.",llama3.1:8b
+factual_003,factual_retrieval,ablation_no_injury,factual_retrieval,machine quad isolation exercise,Leg Extension|Leg Press|Hack Squat,Ab Crunch Machine|Machine Row|Rear Delt Fly Machine,0.0,0.0,3,2,30821.71,4,"Based on your interest in the ""machine quad isolation exercise"", I'm assuming you're looking for a machine-based leg exercise that specifically targets the quadriceps muscle group.
+
+Given the exercises listed, there isn't an exact match for a ""machine quad isolation"" exercise. However, I can recommend a suitable alternative based on similar movement patterns and equipment:
+
+**Leg Extension Machine**: This exercise is often used to isolate the quadriceps muscle group, which is exactly what you're looking for. The Leg Extension Machine typically allows for a range of motion that targets the rectus femoris, vastus lateralis, vastus medialis, and vastus intermedius muscles within the quadriceps.
+
+**Specific instructions:**
+
+1. Sit down on the Leg Extension Machine with your legs extended out in front of you.
+2. Adjust the seat height to ensure your knees are at or below a 90-degree angle when your legs are fully extended.
+3. Grasp the handles and set them to align with your joint path, just like the coaching cues for other exercises.
+4. Slowly lower the weight down by bending your knees, keeping control throughout the movement.
+5. Extend your legs back up to the starting position, squeezing your quadriceps muscles as you do so.
+
+**Additional tips:**
+
+* Focus on controlled movements and avoid bouncing or jerking the weights.
+* Aim for 3 sets of 8-12 reps to start, adjusting based on your individual fitness level and progress.",llama3.1:8b
+cross_001,cross_modal,plain_llm_baseline,cross_modal,find exercise images similar to this bent over row photo,Bent Over Row,Generic coaching advice for,0.0,0.0,1,2,0.0,0,,llama3.1:8b
+cross_001,cross_modal,text_only_retrieval,cross_modal,find exercise images similar to this bent over row photo,Bent Over Row,Bent Over Row|Machine Row|Seated Leg Curl,1.0,1.0,3,5,24.66,1,,llama3.1:8b
+cross_001,cross_modal,full_multimodal_agent,cross_modal,find exercise images similar to this bent over row photo,Bent Over Row,Bent Over Row|Machine Row|Seated Leg Curl,1.0,1.0,5,5,38151.11,4,"Based on the provided images, I recommend exercises that have similar movement patterns and muscle engagement.
+
+Given the bent-over row photos (finish, start, mid), I'll suggest three exercises with similar movement characteristics:
+
+1. **Deadlift**: Deadlifts involve a similar hip hinge motion, engaging multiple muscle groups, including the latissimus dorsi, trapezius, and rhomboids.
+2. **Lat Pulldown**: This exercise targets the latissimus dorsi muscles, which are also engaged during bent-over rows. The pulldown motion helps to strengthen and build these muscles.
+3. **Seated Row**: Seated row machines typically require a similar pulling motion as bent-over rows, targeting the upper back muscles.
+
+To make these recommendations more specific, I'll provide examples of each exercise with varying levels of difficulty:
+
+* Deadlift:
+	+ Use 80-100 kg for 8 reps
+	+ Focus on proper form and hip hinge movement
+* Lat Pulldown:
+	+ Choose a resistance of 20-25 kg for 12 reps
+	+ Emphasize squeezing your lats at the top of the movement
+* Seated Row:
+	+ Select a weight of 15-18 kg for 10 reps
+	+ Maintain proper posture and engage your core
+
+Please note that these are general recommendations. If you have specific goals or preferences (e.g., bodyweight exercises, high-intensity interval training), please let me know, and I'll adjust the suggestions accordingly.
+
+Do any of these exercises interest you?",llama3.1:8b
+cross_001,cross_modal,ablation_no_injury,cross_modal,find exercise images similar to this bent over row photo,Bent Over Row,Bent Over Row|Machine Row|Seated Leg Curl,1.0,1.0,5,5,30600.35,4,"I don't have direct access to image files or external resources. However, based on the provided images of the bent-over row exercise, I'll recommend exercises that are similar in movement and muscle engagement.
+
+Considering the bent-over row primarily targets the latissimus dorsi, trapezius, rhomboids, and biceps brachii muscles, here are some exercises with similar movements:
+
+1. **Seated Row**: This exercise involves pulling a bar towards your chest while seated, engaging the same muscle groups as the bent-over row.
+2. **Pendlay Row**: A variation of the bent-over row that involves lifting the weight from the floor to your side, targeting the latissimus dorsi and trapezius muscles.
+3. **T-Bar Row**: Similar to the bent-over row, but with a T-bar handle, this exercise targets the middle and upper back muscles.
+
+I recommend starting with the Seated Row as it's a low-impact variation that still effectively targets the primary muscle groups involved in the bent-over row.
+
+Please note: I'm not aware of any injury flags or specific limitations. If you have any concerns or injuries, please provide additional context so I can adjust my recommendations accordingly.",llama3.1:8b
+cross_002,cross_modal,plain_llm_baseline,cross_modal,match this leg press image to the correct exercise,Leg Press,Generic coaching advice for,0.0,0.0,1,2,0.0,0,,llama3.1:8b
+cross_002,cross_modal,text_only_retrieval,cross_modal,match this leg press image to the correct exercise,Leg Press,Leg Press|Single Leg Standing Calf Raise|Leg Extension,1.0,1.0,3,5,17.58,1,,llama3.1:8b
+cross_002,cross_modal,full_multimodal_agent,cross_modal,match this leg press image to the correct exercise,Leg Press,Leg Press|Single Leg Standing Calf Raise|Leg Extension,1.0,1.0,5,5,19850.69,4,"Based on the image context provided, I'll give you a personalized recommendation.
+
+Considering the three images of the leg press exercise (start, mid, and finish positions), it seems like all parts of the movement are present. Since there's no specific injury context or progression data to consider, we can focus solely on identifying the correct exercise.
+
+I recommend selecting **Leg Press** as the exercise that matches the image provided.",llama3.1:8b
+cross_002,cross_modal,ablation_no_injury,cross_modal,match this leg press image to the correct exercise,Leg Press,Leg Press|Single Leg Standing Calf Raise|Leg Extension,1.0,1.0,5,5,27400.66,4,"Based on the image context you provided, I'm going to identify the leg press exercise.
+
+To match the images with the correct exercise, let's review them:
+
+1. C:\Users\mahaj\Desktop\fit_support\data\raw\images\leg_press\start.jpeg: This is likely the starting position of the leg press exercise.
+2. C:\Users\mahaj\Desktop\fit_support\data\raw\images\leg_press\finish.jpeg: This is probably the end-range or completion of the leg press movement, where the user has pressed their legs away from themselves as far as possible.
+3. C:\Users\mahaj\Desktop\fit_support\data\raw\images\leg_press\mid.jpeg: This image appears to be at an intermediate position between the start and finish.
+
+Considering these images are likely part of a leg press exercise, I recommend incorporating the Leg Press into your workout routine.",llama3.1:8b
+cross_003,cross_modal,plain_llm_baseline,cross_modal,what exercise does this cable curl image look like,Cable Bicep Curl,Generic coaching advice for,0.0,0.0,1,2,0.0,0,,llama3.1:8b
+cross_003,cross_modal,text_only_retrieval,cross_modal,what exercise does this cable curl image look like,Cable Bicep Curl,Cable Bicep Curl|Cable Row|Cable Fly,1.0,1.0,3,5,21.17,1,,llama3.1:8b
+cross_003,cross_modal,full_multimodal_agent,cross_modal,what exercise does this cable curl image look like,Cable Bicep Curl,Cable Bicep Curl|Cable Row|Cable Fly,1.0,1.0,5,5,20990.59,4,"Based on the images you provided, I recommend incorporating Cable Bicep Curls into your workout routine. Specifically, I suggest targeting 3 sets of 12-15 reps with moderate weight.
+
+Considering no injury context or progression data is available, we can start with this foundational exercise to develop your biceps. Make sure to maintain proper form by keeping your back straight and core engaged throughout the movement.",llama3.1:8b
+cross_003,cross_modal,ablation_no_injury,cross_modal,what exercise does this cable curl image look like,Cable Bicep Curl,Cable Bicep Curl|Cable Row|Cable Fly,1.0,1.0,5,5,23745.94,4,"Based on the image context you provided, it appears to be a cable bicep curl exercise.
+
+Considering there's no injury context or progression data available, I'll provide a generic yet specific exercise recommendation for this muscle group:
+
+**To improve your bicep strength and size, try incorporating:**
+
+* **Cable Bicep Curls**: This is an isolation exercise that targets the biceps brachii. It can be performed with different grip widths to emphasize the long head or short head of the biceps.
+
+Please note that I'm assuming a healthy individual without any injury concerns. If you have any specific injury flags or limitations, please provide more information so I can tailor the recommendation accordingly.",llama3.1:8b
+analytical_001,analytical,plain_llm_baseline,analytical,analyze my strongest lower body baseline lifts,Leg Press|Hip Thrust|Hack Squat|Back Squat,Generic coaching advice for,0.0,0.0,1,2,0.0,0,,llama3.1:8b
+analytical_001,analytical,text_only_retrieval,analytical,analyze my strongest lower body baseline lifts,Leg Press|Hip Thrust|Hack Squat|Back Squat,Hack Squat|Leg Press|Hip Thrust,1.0,1.0,3,5,17.69,1,,llama3.1:8b
+analytical_001,analytical,full_multimodal_agent,analytical,analyze my strongest lower body baseline lifts,Leg Press|Hip Thrust|Hack Squat|Back Squat,Romanian Deadlift|Back Squat|Hack Squat,0.6667,0.5,5,4,31393.11,6,"Based on your strongest lower body baseline lifts, I recommend the following exercises to focus on:
+
+1. **Back Squat**: Given that your best Back Squat weight is 105kg and reps are 4, I suggest increasing the working set to 3-5 reps with a load of 95-100kg. This will allow you to maintain or slightly increase the strength while also challenging your squat technique.
+2. **Romanian Deadlift (RDL)**: Although your RDL best weight is lower at 80kg, it's essential to work on this exercise due to its effectiveness in targeting the hamstrings and glutes. Target a working set of 3-5 reps with 75-80kg to improve technique and increase strength.
+
+Avoiding exercises that conflict with injury flags or limitations:
+
+* **Leg Press**: Since your best Leg Press weight is already high at 230kg, I recommend focusing on the mentioned Back Squat and RDL exercises instead.
+* **Hip Thrust**: Although a solid lift for you, it's essential to prioritize exercises that target multiple muscle groups effectively. The Back Squat and RDL will help in achieving this.
+
+Keep in mind to:
+
+- Warm up thoroughly before each workout
+- Focus on proper technique throughout the exercises
+- Gradually increase weight or reps over time based on your progression data",llama3.1:8b
+analytical_001,analytical,ablation_no_injury,analytical,analyze my strongest lower body baseline lifts,Leg Press|Hip Thrust|Hack Squat|Back Squat,Romanian Deadlift|Back Squat|Hack Squat,0.6667,0.5,5,4,34935.72,6,"Based on your strong lower body lifts, I recommend we focus on building upon those strengths while continuing to challenge you with progressive overload.
+
+To do this, I suggest we aim for an increase in weight or reps in one of your baseline exercises and simultaneously address the Romanian Deadlift and Back Squat, which are currently lagging behind your other lifts.
+
+Given your exceptional Hack Squat performance, let's focus on increasing its intensity by adding 5-10 kg to your best lift. Specifically, aim for a new personal record in the next 4-6 weeks.
+
+To work towards this goal, I recommend implementing a periodized training plan that includes:
+
+1. **Hack Squat**: Perform at least one set of 3 reps with an increased weight each week. Target a progressive overload of 2.5 kg every two workouts.
+2. **Romanian Deadlift (RDL)**: Incorporate RDLs into your routine, focusing on proper form and gradually increasing the weight to reach a new personal record within the next 6 weeks. Start with lighter weights and aim for 8-10 reps in each set.
+
+To ensure we're making progress without overloading your joints, I recommend limiting Back Squat sets to 3 reps or less until you can regain strength and confidence in this lift.
+
+**Targeted Progression Goals:**
+
+* Hack Squat:
+	+ Increase best weight by 10 kg within the next 4-6 weeks
+* Romanian Deadlift (RDL):
+	+ Reach a new personal record of at least 8 reps with an increased weight
+
+By following this plan, you'll be able to build upon your existing strengths while targeting areas for improvement. This will help you continue making progress and avoid plateaus.
+
+Do these recommendations align with your goals and preferences?",llama3.1:8b
+analytical_002,analytical,plain_llm_baseline,analytical,compare my press strength baselines,Barbell Bench Press|Dumbbell Flat Bench Press|Dumbbell Shoulder Press,Generic coaching advice for,0.0,0.0,1,2,0.0,0,,llama3.1:8b
+analytical_002,analytical,text_only_retrieval,analytical,compare my press strength baselines,Barbell Bench Press|Dumbbell Flat Bench Press|Dumbbell Shoulder Press,Barbell Bench Press|Dumbbell Flat Bench Press|Leg Press,0.6667,1.0,3,4,16.53,1,,llama3.1:8b
+analytical_002,analytical,full_multimodal_agent,analytical,compare my press strength baselines,Barbell Bench Press|Dumbbell Flat Bench Press|Dumbbell Shoulder Press,Leg Press|Barbell Bench Press|Dumbbell Flat Bench Press,0.6667,0.5,5,4,32133.97,6,"Based on your lift history and progression data, I recommend comparing your Barbell Bench Press (1RM baseline) to your Dumbbell Flat Bench Press (personal baseline).
+
+While your Leg Press is also a strength exercise, it's primarily targeting the legs rather than upper body, so we'll focus on chest exercises here.
+
+To make a fair comparison between these two exercises:
+
+**Barbell Bench Press:**
+
+* Best weight: 85 kg
+* Best reps: 1 rep (1RM baseline)
+
+**Dumbbell Flat Bench Press:**
+
+* Best weight: 35 kg
+* Best reps: 6 reps (personal baseline)
+
+Considering the significant difference in best weights and rep ranges, I'd recommend a gradual increase in volume and intensity for your Dumbbell Flat Bench Press to better understand its relationship with your Barbell Bench Press.
+
+**Specific Recommendation:**
+
+1. Increase your Dumbbell Flat Bench Press weight by 2-3 kg (from 35 kg) over the next few sessions.
+2. Aim to perform 4-5 reps at this new weight, focusing on proper form and control.
+3. Monitor your progress, and once you've achieved 4-5 reps with ease, reassess your Dumbbell Flat Bench Press baseline.
+
+This will help you better understand how your Dumbbell Flat Bench Press stacks up against your Barbell Bench Press and inform future training decisions.",llama3.1:8b
+analytical_002,analytical,ablation_no_injury,analytical,compare my press strength baselines,Barbell Bench Press|Dumbbell Flat Bench Press|Dumbbell Shoulder Press,Leg Press|Barbell Bench Press|Dumbbell Flat Bench Press,0.6667,0.5,5,4,39786.37,6,"Based on your lift history and progression data, I'd like to compare your press strength baselines.
+
+**Barbell Bench Press (1RM Baseline):**
+Your best weight is 85 kg with 1 rep, indicating a strong upper body pushing capacity. However, the low number of reps suggests that you may be relying heavily on pure strength rather than power or endurance.
+
+**Dumbbell Flat Bench Press (Personal Baseline):**
+In contrast, your Dumbbell Flat Bench Press best weight is significantly lower at 35 kg with 6 reps. This indicates a stronger emphasis on muscle endurance and control, which can be beneficial for overall chest development.
+
+**Leg Press:**
+While not directly related to press strength, it's worth noting that your Leg Press progress (best weight: 230 kg with 4 reps) demonstrates impressive lower body strength. However, since the exercise is focused on quadriceps-dominant movement, we won't draw direct comparisons for upper body press development.
+
+Considering these differences and aiming to build a more well-rounded pressing capacity, I recommend:
+
+**Progressive Overload:** Gradually increase your Barbell Bench Press weight over time. Aim to add 2.5-5 kg every two weeks, targeting higher reps (3-5) as you become stronger.
+
+**Accessory Work:**
+1. **Incline Dumbbell Press**: To improve upper chest development and balance out your pressing capacity, focus on Incline Dumbbell Press with lighter weights (30-40 kg) for 8-12 reps.
+2. **Cable Flyes**: Incorporate Cable Flyes to target the chest muscles from a different angle. Use lighter weights (10-20 kg) for 12-15 reps.
+
+**Training Frequency:**
+Aim to train your upper body, including pressing exercises like Barbell Bench Press and Incline Dumbbell Press, at least twice per week with adequate recovery time between sessions.
+
+By implementing these recommendations, you'll be able to build strength and endurance in both your Barbell Bench Press and Dumbbell Flat Bench Press, creating a more balanced and robust upper body.",llama3.1:8b
+personal_001,personalized_followup,plain_llm_baseline,personalized_followup,recommend a knee friendly quad exercise for me,Hack Squat|Leg Press|Leg Extension,Generic coaching advice for,0.0,0.0,1,2,0.0,0,,llama3.1:8b
+personal_001,personalized_followup,text_only_retrieval,personalized_followup,recommend a knee friendly quad exercise for me,Hack Squat|Leg Press|Leg Extension,Hack Squat|Back Squat|Leg Extension,0.6667,1.0,3,4,17.94,1,,llama3.1:8b
+personal_001,personalized_followup,full_multimodal_agent,personalized_followup,recommend a knee friendly quad exercise for me,Hack Squat|Leg Press|Leg Extension,Hack Squat|Back Squat|Leg Extension,0.6667,1.0,5,4,18569.48,5,"Based on your retrieved exercises and injury context, I recommend the Leg Extension machine exercise for a knee-friendly quad workout.
+
+Given that it specifically targets the quadriceps muscle group without any notable knee stress or risk, and it's a low-impact movement, this exercise should be safe for you to perform. Make sure to follow the coaching cues provided in the exercise information: set the seat and handles to align with your joint path, ensuring smooth movement and controlled extension of your knees.",llama3.1:8b
+personal_001,personalized_followup,ablation_no_injury,personalized_followup,recommend a knee friendly quad exercise for me,Hack Squat|Leg Press|Leg Extension,Hack Squat|Back Squat|Leg Extension,0.6667,1.0,5,4,18183.4,5,"Based on your request for a knee-friendly quad exercise and considering the exercises in our library, I recommend performing **Leg Extension**.
+
+This exercise specifically targets the quadriceps muscle group without putting excessive stress on the knees, as seen with lower-body compound movements like squats. Make sure to adjust the seat height and handle position so that the joint path is aligned, following the coaching cues provided for this exercise. This will help ensure you're targeting the quads effectively while minimizing knee strain.
+
+Please proceed with Leg Extension as your quad-focused exercise, keeping in mind the conservative approach due to the absence of specific knee-related injury notes.",llama3.1:8b
+personal_002,personalized_followup,plain_llm_baseline,personalized_followup,"given my bodyweight pull up baseline, what back movement should I focus on",Pull Ups|Lat Pulldown|Seated Cable Row,Generic coaching advice for,0.0,0.0,1,2,0.0,0,,llama3.1:8b
+personal_002,personalized_followup,text_only_retrieval,personalized_followup,"given my bodyweight pull up baseline, what back movement should I focus on",Pull Ups|Lat Pulldown|Seated Cable Row,Back Squat|Pull Ups|Dumbbell Incline Bench Press,0.3333,0.5,3,3,21.28,1,,llama3.1:8b
+personal_002,personalized_followup,full_multimodal_agent,personalized_followup,"given my bodyweight pull up baseline, what back movement should I focus on",Pull Ups|Lat Pulldown|Seated Cable Row,Pull Ups|Dumbbell Shoulder Press|Seated Cable Row,0.6667,1.0,5,4,26339.49,5,"Given your bodyweight pull-up baseline and strength levels in other exercises like the Back Squat, I recommend you focus on building lat strength with the Bent-Over Row using dumbbells or a barbell.
+
+This exercise targets the lats effectively without putting excessive stress on your shoulders compared to other pulling movements. Considering your best performance in the Dumbbell Incline Bench Press (8 reps at 30 kg), it suggests you have moderate upper body strength, which should be sufficient for performing Bent-Over Rows with a weight that challenges your lat muscles.
+
+To tailor this recommendation further, let's assume we can start with a weight that allows you to perform 6-8 reps. This will ensure progressive overload on your lats without overloading other muscle groups. If you're able to complete the given number of reps, gradually increase the weight or resistance in subsequent sessions to continue challenging yourself and building strength.
+
+Remember to maintain proper form throughout, keeping your back straight, engaging your core, and avoiding swinging the weights to get an easier lift.",llama3.1:8b
+personal_002,personalized_followup,ablation_no_injury,personalized_followup,"given my bodyweight pull up baseline, what back movement should I focus on",Pull Ups|Lat Pulldown|Seated Cable Row,Pull Ups|Dumbbell Shoulder Press|Seated Cable Row,0.6667,1.0,5,4,18874.05,5,"Given your bodyweight pull-up baseline and considering your strength in compound exercises like the Back Squat, I recommend focusing on weighted row variations to challenge and develop your back muscles.
+
+Specifically, I suggest introducing Dumbbell Bent-Over Rows (DBBOR) as a progressive overload exercise for your lats. This movement will help you build strength and control while avoiding any potential strain on your shoulders or upper body that might come with higher-intensity rowing exercises like the pull-up.
+
+To start, aim to perform 3 sets of DBBOR with a weight that allows you to complete at least 8 reps with good form. Over time, incrementally increase the load as you build strength and continue to challenge your back muscles.",llama3.1:8b
+personal_003,personalized_followup,plain_llm_baseline,personalized_followup,what glute exercise fits my current strength profile,Hip Thrust|Romanian Deadlift|Leg Press,Generic coaching advice for,0.0,0.0,1,2,0.0,0,,llama3.1:8b
+personal_003,personalized_followup,text_only_retrieval,personalized_followup,what glute exercise fits my current strength profile,Hip Thrust|Romanian Deadlift|Leg Press,Back Squat|Back Squat|Hack Squat,0.0,0.0,3,2,15.69,1,,llama3.1:8b
+personal_003,personalized_followup,full_multimodal_agent,personalized_followup,what glute exercise fits my current strength profile,Hip Thrust|Romanian Deadlift|Leg Press,Back Squat|Hack Squat|Leg Press,0.3333,0.3333,5,3,22805.33,5,"Based on your strength profile and exercise history, I recommend the **Hip Thrust** as a glute-focused exercise that complements your current abilities.
+
+Considering you've shown proficiency in both Back Squat (105kg for 4 reps) and Hack Squat (140kg for 6 reps), it's likely you can handle a Hip Thrust with a substantial load. The Hip Thrust is an isolation movement that targets the glutes specifically, allowing you to focus on building strength in this area without putting unnecessary stress on your knees or lower back.
+
+To start, aim for a weight around 120-130kg and work up to higher loads as you progress. Focus on maintaining proper form by keeping your feet flat under your hips and squeezing your glutes at the top of each rep.",llama3.1:8b
+personal_003,personalized_followup,ablation_no_injury,personalized_followup,what glute exercise fits my current strength profile,Hip Thrust|Romanian Deadlift|Leg Press,Back Squat|Hack Squat|Leg Press,0.3333,0.3333,5,3,28140.6,5,"Based on your current strength profile and exercise history, I recommend the Deadlift with a focus on glute activation.
+
+Since you have a solid foundation in squatting with the Back Squat (best weight 105kg for 4 reps), it's time to challenge yourself with a different movement that targets the glutes. The Deadlift is an excellent choice as it engages multiple muscle groups, including your glutes, hamstrings, and quads.
+
+Considering you've already demonstrated strength in the Hack Squat (140kg for 6 reps), I believe you're ready to tackle the Deadlift with a moderate weight. To ensure proper form and reduce the risk of injury, focus on maintaining a tight posture, engaging your core, and keeping the bar close to your shins.
+
+As a starting point, aim for a weight that allows you to complete 3-5 reps with control. Monitor your progress and adjust the weight accordingly.
+
+**Exercise:** Deadlift
+**Equipment:** Barbell
+**Muscle groups:** Glutes / Hamstrings / Quads
+**Coaching cues:**
+1. Maintain a tight posture, keeping your chest up and shoulders relaxed.
+2. Engage your core by drawing your belly button towards your spine.
+3. Keep the bar close to your shins throughout the entire movement.
+
+Let's see how you perform with this exercise!",llama3.1:8b

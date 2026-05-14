@@ -16,7 +16,10 @@ full execution path from AgentState.tool_calls_log.
 """
 from __future__ import annotations
 
+import json
 import sys
+import urllib.error
+import urllib.request
 from pathlib import Path
 from typing import Any
 
@@ -34,6 +37,147 @@ from config import cfg
 from retrieval.search import search_exercise_by_text, search_similar_exercise_image
 
 _CHROMA_PATH = cfg.chroma.persist_path
+
+# ── LLM prompts ────────────────────────────────────────────────────────────────
+
+_SYSTEM_PROMPT = (
+    "You are my personal fitness coach with access to the user's workout "
+    "history, injury context, and exercise library. Always:\n"
+    "- Reference specific exercises from the retrieved context\n"
+    "- Respect injury limitations explicitly\n"
+    "- Reference the user's actual progression data when available\n"
+    "- Never recommend exercises that conflict with injury flags\n"
+    "- Be specific, not generic"
+)
+
+# ── Runtime overrides ──────────────────────────────────────────────────────────
+# Use set_active_model() / set_top_k_override() to change at runtime (UI, eval).
+
+_active_model: str | None = None
+_top_k_override: int | None = None
+
+# Once Ollama is confirmed unreachable (first failed call), we skip further
+# network attempts in the same process to avoid long timeouts in batch runs.
+_ollama_confirmed_down: bool = False
+
+
+def set_active_model(model: str | None) -> None:
+    """Override the active LLM model. Pass None to revert to cfg.llm.primary_model."""
+    global _active_model
+    _active_model = model
+
+
+def set_top_k_override(top_k: int | None) -> None:
+    """Override the retrieval top_k. Pass None to revert to cfg.retrieval.top_k."""
+    global _top_k_override
+    _top_k_override = top_k
+
+
+def _get_model() -> str:
+    return _active_model if _active_model is not None else cfg.llm.primary_model
+
+
+def _get_top_k() -> int:
+    return _top_k_override if _top_k_override is not None else cfg.retrieval.top_k
+
+
+# ── Ollama integration ─────────────────────────────────────────────────────────
+
+def call_ollama(
+    user_prompt: str,
+    system_prompt: str,
+    model: str,
+    base_url: str | None = None,
+    timeout: int = 60,
+) -> str:
+    """Call the Ollama /api/chat endpoint and return the assistant response text.
+
+    Pass ``model`` explicitly to switch between cfg.llm.primary_model and
+    cfg.llm.secondary_model — this is the designated model-comparison helper.
+
+    Parameters
+    ----------
+    user_prompt : str
+        Fully-formatted user turn including all retrieved context.
+    system_prompt : str
+        System instructions placed before the user turn.
+    model : str
+        Ollama model tag, e.g. "llama3.1:8b" or "qwen2.5:7b".
+    base_url : str | None
+        Ollama base URL; defaults to cfg.llm.ollama_base_url.
+    timeout : int
+        Socket timeout in seconds (default 60).  Lower values let the eval
+        harness fail fast when Ollama is unreachable.
+    """
+    _base = base_url or cfg.llm.ollama_base_url
+    payload = json.dumps(
+        {
+            "model": model,
+            "messages": [
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": user_prompt},
+            ],
+            "stream": False,
+        }
+    ).encode("utf-8")
+    req = urllib.request.Request(
+        f"{_base}/api/chat",
+        data=payload,
+        headers={"Content-Type": "application/json"},
+        method="POST",
+    )
+    global _ollama_confirmed_down
+    if _ollama_confirmed_down:
+        return f"[Ollama unavailable — start Ollama and retry. Endpoint: {_base}]"
+
+    try:
+        with urllib.request.urlopen(req, timeout=timeout) as resp:
+            data = json.loads(resp.read().decode("utf-8"))
+            return str(data["message"]["content"])
+    except urllib.error.URLError as exc:
+        # Connection refused / DNS failure — Ollama is not running at all.
+        _ollama_confirmed_down = True
+        return (
+            f"[Ollama connection error — is Ollama running at {_base}?]\n"
+            f"Error details: {exc}"
+        )
+    except (TimeoutError, OSError) as exc:
+        # Model load timeout or transient OS error — don't permanently blacklist.
+        return (
+            f"[Ollama response timeout after {timeout}s — model may still be loading.]\n"
+            f"Error details: {exc}"
+        )
+    except (KeyError, json.JSONDecodeError) as exc:
+        return f"[Ollama response parse error: {exc}]"
+
+
+def check_ollama(base_url: str | None = None) -> bool:
+    """Return True if the Ollama endpoint is reachable (3-second probe)."""
+    global _ollama_confirmed_down
+    _base = base_url or cfg.llm.ollama_base_url
+    req = urllib.request.Request(f"{_base}/api/tags", method="GET")
+    try:
+        with urllib.request.urlopen(req, timeout=3):
+            _ollama_confirmed_down = False
+            return True
+    except (urllib.error.URLError, TimeoutError, OSError):
+        return False
+
+
+def _build_user_prompt(state: AgentState) -> str:
+    """Assemble the user-turn prompt from all accumulated context fields in state."""
+
+    def _fmt(items: list[str]) -> str:
+        return "\n".join(items) if items else "None"
+
+    return (
+        f"Query: {state['query']}\n\n"
+        f"Retrieved exercises: {_fmt(state.get('retrieved_text_context', []))}\n"
+        f"Injury context: {_fmt(state.get('injury_context', []))}\n"
+        f"Progression data: {_fmt(state.get('progression_context', []))}\n"
+        f"Image context: {_fmt(state.get('retrieved_image_context', []))}\n\n"
+        "Provide a specific, personalized recommendation."
+    )
 
 
 # ── private helpers ────────────────────────────────────────────────────────────
@@ -62,7 +206,7 @@ def text_retrieval_node(state: AgentState) -> dict:
     """Retrieve top-k exercise documents via semantic text search against fitness_text."""
     records = search_exercise_by_text(
         state["query"],
-        top_k=cfg.retrieval.top_k,
+        top_k=_get_top_k(),
         chroma_path=_CHROMA_PATH,
     )
     return {
@@ -81,7 +225,9 @@ def image_retrieval_node(state: AgentState) -> dict:
         path = ROOT / path
     if not path.is_file():
         return {"retrieved_image_context": [], "tool_calls_log": ["image_retrieval"]}
-    records = search_similar_exercise_image(path, top_k=cfg.retrieval.top_k, chroma_path=_CHROMA_PATH)
+    records = search_similar_exercise_image(
+        path, top_k=_get_top_k(), chroma_path=_CHROMA_PATH
+    )
     return {
         "retrieved_image_context": _extract_docs(records),
         "tool_calls_log": ["image_retrieval"],
@@ -90,7 +236,7 @@ def image_retrieval_node(state: AgentState) -> dict:
 
 def injury_lookup_node(state: AgentState) -> dict:
     """Load injury-memory records that match body-part terms in the query."""
-    result = InjuryMemoryTool().run(state["query"], top_k=cfg.retrieval.top_k)
+    result = InjuryMemoryTool().run(state["query"], top_k=_get_top_k())
     return {
         "injury_context": _extract_docs(result.records),
         "tool_calls_log": ["injury_lookup"],
@@ -99,7 +245,7 @@ def injury_lookup_node(state: AgentState) -> dict:
 
 def progression_analysis_node(state: AgentState) -> dict:
     """Retrieve personal strength-progression records relevant to the query."""
-    result = StrengthProgressionTool().run(state["query"], top_k=cfg.retrieval.top_k)
+    result = StrengthProgressionTool().run(state["query"], top_k=_get_top_k())
     return {
         "progression_context": _extract_docs(result.records),
         "tool_calls_log": ["progression_analysis"],
@@ -117,26 +263,16 @@ def context_fusion_node(state: AgentState) -> dict:
 
 
 def generation_node(state: AgentState) -> dict:
-    """Compose a final response string from all accumulated context fields.
+    """Call Ollama to generate a personalised fitness coaching response.
 
-    In production this node calls an LLM; here it produces a deterministic
-    template that is used by the evaluation harness.
+    Uses _get_model() which respects any active model override, defaulting to
+    cfg.llm.primary_model.  All four context buckets from AgentState are
+    injected into the user prompt so the LLM has full retrieval context.
     """
-    parts: list[str] = []
-    for bucket in (
-        state.get("retrieved_text_context", []),
-        state.get("retrieved_image_context", []),
-        state.get("injury_context", []),
-        state.get("progression_context", []),
-    ):
-        parts.extend(bucket)
-
-    if parts:
-        context_block = "\n".join(f"- {p[:200]}" for p in parts[:9])
-        response = f"Based on retrieved context:\n{context_block}\n\nQuery: {state['query']}"
-    else:
-        response = f"No relevant context found for: {state['query']}"
-
+    model = _get_model()
+    user_prompt = _build_user_prompt(state)
+    # 300 s covers cold-start model loading (4-5 GB models can take 2-3 min).
+    response = call_ollama(user_prompt, _SYSTEM_PROMPT, model, timeout=300)
     return {
         "final_response": response,
         "tool_calls_log": ["generation"],
@@ -183,7 +319,12 @@ def build_graph() -> Any:
     graph.set_entry_point("router")
     graph.add_conditional_edges("router", route_by_query_type)
 
-    for retrieval_node in ("text_retrieval", "image_retrieval", "injury_lookup", "progression_analysis"):
+    for retrieval_node in (
+        "text_retrieval",
+        "image_retrieval",
+        "injury_lookup",
+        "progression_analysis",
+    ):
         graph.add_edge(retrieval_node, "context_fusion")
 
     graph.add_edge("context_fusion", "generation")
@@ -218,3 +359,36 @@ def run_graph(query: str, image_path: str | None = None) -> AgentState:
         "final_response": "",
     }
     return compiled_graph.invoke(initial)
+
+
+def run_graph_with_model(
+    query: str,
+    model: str,
+    image_path: str | None = None,
+    top_k: int | None = None,
+) -> AgentState:
+    """Run the graph with a specific LLM model (and optional top_k override).
+
+    This is the recommended entry point for comparing cfg.llm.primary_model
+    against cfg.llm.secondary_model.  Both overrides are always reset after
+    the call, even if an exception is raised.
+
+    Parameters
+    ----------
+    query : str
+        User question.
+    model : str
+        Ollama model tag to use, e.g. cfg.llm.primary_model or
+        cfg.llm.secondary_model.
+    image_path : str | None
+        Optional path to a query image.
+    top_k : int | None
+        Override retrieval depth; None keeps cfg.retrieval.top_k.
+    """
+    set_active_model(model)
+    set_top_k_override(top_k)
+    try:
+        return run_graph(query, image_path=image_path)
+    finally:
+        set_active_model(None)
+        set_top_k_override(None)

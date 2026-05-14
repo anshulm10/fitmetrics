@@ -33,6 +33,19 @@ Local-first multimodal RAG fitness assistant for personalized exercise recommend
 
 ---
 
+## Quick start
+
+```bash
+# Full pipeline (ingest → index → eval)
+uv run python run_all.py
+
+# Streamlit UI
+uv run streamlit run ui/app.py
+
+# Evaluation only
+uv run python -m evaluation.run_evaluation
+```
+
 ## Project Goal
 Build a local-first multimodal RAG fitness assistant that ingests workout history, lift progression, injury context, and exercise images, then retrieves personalized evidence for recommendation generation.
 
@@ -498,3 +511,118 @@ After a successful run you should see:
 `uv.lock` is committed and **must not be modified manually**.  To add a new
 dependency, run `uv add <package>` which updates both `pyproject.toml` and
 `uv.lock` atomically.
+
+To what extent does injury-aware multimodal retrieval augmentation reduce unsafe exercise recommendations compared to text-only and non-retrieval baselines, in a personalized fitness domain?
+
+For report:*****
+The plain_llm_baseline entries should all be missing_context not wrong_retrieval — the system isn't retrieving wrongly, it's not retrieving at all. This distinction actually strengthens your argument for why retrieval matters.
+The text_only_retrieval glute query has a duplicate — Back Squat appears twice. That's a deduplication bug in your retrieval pipeline worth one sentence in your error analysis: "text_only_retrieval exhibited duplicate results for query personal_003, suggesting the absence of ID-level deduplication in the text retrieval path."
+*****
+
+## Appendix: LLM-as-Judge Scoring Prompt
+
+The following prompt was used to evaluate `relevance_score` and 
+`personalization_score` for each system response.
+
+```
+You are an expert fitness coach and evaluation assistant.
+You will be given a user query, a set of retrieved exercise context, 
+and a system response. Score the response on two dimensions.
+
+Query: {query}
+Retrieved Context: {retrieved_context}
+Response: {response}
+
+Score 1 — Relevance (1-5):
+Does the response directly address what the user asked for?
+1 = completely off-topic
+3 = partially relevant, some useful content
+5 = directly and fully addresses the query
+
+Score 2 — Personalization (1-5):
+Does the response reference the user's specific data 
+(workout history, injury context, progression)?
+1 = generic advice, no personal data referenced
+3 = some personal data referenced
+5 = deeply personalized, references specific user history
+
+Reply in this exact format only:
+relevance_score: <int>
+personalization_score: <int>
+```
+
+**Notes on scoring methodology:**
+- Scores were produced by Llama 3.1 8B running locally via Ollama
+- Each query was scored independently with no conversation history
+- The same prompt and model were used across all four system conditions
+  to ensure comparability
+- Scores are integers 1–5; no half-points were used
+- Limitation: LLM self-evaluation introduces potential bias since the 
+  same model family used for generation also scored the outputs.
+
+  Report: "A limitation of this evaluation methodology is that the judge model (Llama 3.1 8B) shares an architecture with the generation model, which may introduce self-preference bias in scoring. Future work could use a separate judge model or human raters."
+
+## Ground Truth Construction
+
+Ground truth relevance labels for Recall@k were defined manually by the author
+prior to running evaluation. For each benchmark query, the set of relevant
+document IDs was determined by the author's own domain knowledge of the
+personal dataset — for example, knowing that "machine quad isolation exercise"
+should return leg extension or hack squat variants, not ab or back machines.
+
+**Limitations:** This approach introduces annotator bias since the same person
+who designed and built the system also defined what counts as relevant. A more
+rigorous evaluation would involve a second independent annotator or blind
+labelling to compute inter-annotator agreement (e.g. Cohen's Kappa). This is
+acknowledged as a limitation of the current evaluation methodology; the
+Recall@k scores should be interpreted as indicative rather than definitive.
+
+
+## Limitations and Future Work
+
+### What the system lacks:
+1. **Small dataset** — 63 text records and 21 images is limited.
+   A larger exercise corpus would improve retrieval diversity.
+
+2. **Self-defined ground truth** — Recall@k labels were defined by
+   the author, introducing potential bias.
+
+3. **Single-domain evaluation** — All queries are fitness-specific;
+   generalizability to other personal domains is untested.
+
+4. **LLM judge bias** — The same model family used for generation
+   also scored outputs, risking self-preference inflation.
+
+5. **No reranking** — Pure vector search without a reranker means
+   semantically adjacent but irrelevant results occasionally surface
+   (evidenced by wrong_retrieval failure cases).
+
+### What would make it better:
+- A reranking layer (e.g. cross-encoder) after initial retrieval
+- Larger image dataset for more meaningful CLIP retrieval
+- Human evaluation alongside LLM-as-judge
+- Persistent conversation memory across sessions
+- Fine-tuned embeddings on fitness-specific vocabulary
+
+---
+
+## Embedding Model Justification
+
+**Text embeddings: `all-MiniLM-L6-v2`**
+Selected over larger alternatives such as `all-mpnet-base-v2` or
+`all-MiniLM-L12-v2` due to local hardware constraints (16GB RAM, no dedicated
+GPU). `all-MiniLM-L6-v2` delivers strong semantic retrieval performance on
+sentence-level fitness queries at significantly lower memory and inference cost.
+Given the dataset size (63 text records), the marginal quality gain from a
+larger model does not justify the added latency in a locally-run system.
+
+**Image embeddings: `clip-ViT-B/32`**
+Selected over `clip-ViT-L/14` for the same hardware reasons. `ViT-L/14`
+provides marginally better zero-shot image-text alignment but requires
+substantially more memory at inference time. Critically, the image dataset
+contains only 21 records — at this scale, the performance delta between
+ViT-B/32 and ViT-L/14 is negligible, and the smaller model is more
+appropriate given the data volume. The limited image dataset size is
+acknowledged as a constraint of using personal gym photos; expanding
+this corpus would be a meaningful direction for future work.
+
