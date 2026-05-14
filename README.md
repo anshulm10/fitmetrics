@@ -3,7 +3,7 @@
 Local-first multimodal RAG fitness assistant for personalized exercise recommendations.
 
 ## Current milestone
-- M1 through M5 complete.
+- M1 through M5 complete. User coaching philosophy injected into generation system prompt.
 
 ## Task checklist
 - [x] Define architecture-first folder structure and module placeholders.
@@ -13,6 +13,8 @@ Local-first multimodal RAG fitness assistant for personalized exercise recommend
 - [x] Implement multimodal retrieval merge/rerank with injury-aware filtering.
 - [x] Add retrieval tests and validate retrieval relevance on sample queries.
 - [x] Add baseline-vs-RAG evaluation harness.
+- [x] Add user profile (`data/raw/user_profile.json`) with coaching philosophy, form principles, and injury context.
+- [x] Load user profile once at startup via `src/config.py` and inject Jeff Nippard methodology block into the generation node system prompt.
 
 ## Blockers
 - No labeled retrieval dataset yet for robust metric-driven tuning.
@@ -30,6 +32,8 @@ Local-first multimodal RAG fitness assistant for personalized exercise recommend
 - Use separate Chroma collections per modality: workouts, lifts, injuries, images.
 - Use sentence-transformers for text and CLIP-compatible model path for images.
 - Keep implementation local-first using filesystem + persistent Chroma database.
+- Store user coaching philosophy in `data/raw/user_profile.json`; load once at startup via `config.load_user_profile()` so all modules share a single cached read.
+- Inject Jeff Nippard methodology as a named `_COACHING_PHILOSOPHY` constant appended to `_SYSTEM_PROMPT`, keeping the coaching layer separate from the base agent instructions for easy iteration.
 
 ---
 
@@ -94,6 +98,7 @@ Build a local-first multimodal RAG fitness assistant that ingests workout histor
 - `data/raw/lifts`
 - `data/raw/images`
 - `data/raw/injuries`
+- `data/raw/user_profile.json`
 - `data/processed`
 - `data/chroma`
 - `data/eval`
@@ -201,6 +206,19 @@ flowchart LR
   - Dedupe strength and workout streams while ingesting; write empty DataFrames with fixed column headers when no rows pass validation.
 - Next milestone:
   - Point the existing Chroma / embedding ingest path at `data/processed/*.csv` as an optional second stage, or add a small adapter that reads clean files into `ContextChunk` records.
+
+### Day 5 — User coaching philosophy + system prompt personalisation
+- What was built:
+  - `data/raw/user_profile.json` — user profile with `coaching_philosophy`, `form_principles`, and injury context (left knee, severity: severe, with mandatory protocols).
+  - `src/config.py` — added `_USER_PROFILE_PATH`, `load_user_profile()` (same `@lru_cache(maxsize=1)` pattern as `load_config`), and module-level `user_profile` constant importable as `from config import user_profile`.
+  - `src/agent/graph.py` — added `_COACHING_PHILOSOPHY` constant built from the profile, appended to `_SYSTEM_PROMPT` so every generation call carries full Jeff Nippard methodology context and injury override directive.
+- Architecture:
+  - Profile is loaded once at import time; zero disk I/O per request.
+  - `_COACHING_PHILOSOPHY` is a named constant separate from the base agent instructions, making it easy to swap or extend per-user without touching the core prompt.
+- Issues encountered:
+  - None.
+- Next milestone:
+  - Wire specific injury triggers from `user_profile["injuries"]` into the retrieval filtering path so the injury lookup node can cross-reference the profile's mandatory protocols.
 
 ### Day 5 — Phase 2 multimodal embedding + retrieval
 - What was built:

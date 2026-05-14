@@ -33,12 +33,22 @@ if str(SRC) not in sys.path:
 from agent.router import QueryRoute, QueryRouter
 from agent.state import AgentState
 from agent.tools import InjuryMemoryTool, StrengthProgressionTool
-from config import cfg
+from config import cfg, user_profile
 from retrieval.search import search_exercise_by_text, search_similar_exercise_image
 
 _CHROMA_PATH = cfg.chroma.persist_path
 
 # ── LLM prompts ────────────────────────────────────────────────────────────────
+
+_COACHING_PHILOSOPHY = (
+    "This user follows Jeff Nippard training methodology. "
+    "For every exercise recommendation, apply these principles:\n"
+    "- Prioritise the stretch position at the bottom of the movement\n"
+    "- Always cue controlled negatives (eccentric phase)\n"
+    "- Full ROM where injury permits\n"
+    "- Never give generic beginner cues — this is an experienced lifter\n\n"
+    "Injury context must always override exercise recommendations."
+)
 
 _SYSTEM_PROMPT = (
     "You are my personal fitness coach with access to the user's workout "
@@ -47,7 +57,8 @@ _SYSTEM_PROMPT = (
     "- Respect injury limitations explicitly\n"
     "- Reference the user's actual progression data when available\n"
     "- Never recommend exercises that conflict with injury flags\n"
-    "- Be specific, not generic"
+    "- Be specific, not generic\n\n"
+    + _COACHING_PHILOSOPHY
 )
 
 # ── Runtime overrides ──────────────────────────────────────────────────────────
@@ -335,6 +346,7 @@ def build_graph() -> Any:
 
 # Module-level compiled graph — import and call .invoke() directly.
 compiled_graph = build_graph()
+graph = compiled_graph  # alias for ergonomic imports: from src.agent.graph import graph
 
 
 def run_graph(query: str, image_path: str | None = None) -> AgentState:

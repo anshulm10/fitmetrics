@@ -7,14 +7,16 @@ or numbers.
 
 Usage
 -----
-    from config import cfg
+    from config import cfg, user_profile
 
     top_k     = cfg.retrieval.top_k
     seed      = cfg.evaluation.random_seed
     text_col  = cfg.chroma.text_collection
+    philosophy = user_profile["coaching_philosophy"]
 """
 from __future__ import annotations
 
+import json
 from dataclasses import dataclass
 from functools import lru_cache
 from pathlib import Path
@@ -24,6 +26,7 @@ import yaml
 
 _ROOT = Path(__file__).resolve().parents[1]
 _CONFIG_PATH = _ROOT / "config" / "config.yaml"
+_USER_PROFILE_PATH = _ROOT / "data" / "raw" / "user_profile.json"
 
 
 # ── section dataclasses ────────────────────────────────────────────────────────
@@ -126,3 +129,22 @@ def load_config(config_path: Path = _CONFIG_PATH) -> AppConfig:
 
 # Module-level singleton — import `cfg` directly for convenience.
 cfg: AppConfig = load_config()
+
+
+# ── user profile ───────────────────────────────────────────────────────────────
+
+@lru_cache(maxsize=1)
+def load_user_profile(profile_path: Path = _USER_PROFILE_PATH) -> dict[str, Any]:
+    """Load and cache data/raw/user_profile.json.  Call once; subsequent calls are free.
+
+    Parameters
+    ----------
+    profile_path : Path
+        Override the default profile path (useful in tests).
+    """
+    with open(profile_path, encoding="utf-8") as fh:
+        return json.load(fh)
+
+
+# Module-level singleton — import `user_profile` directly for convenience.
+user_profile: dict[str, Any] = load_user_profile()

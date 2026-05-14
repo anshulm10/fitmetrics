@@ -1,0 +1,16 @@
+{
+  "coaching_philosophy": "Trained under Jeff Nippard methodology",
+  "form_principles": [
+    "Always prioritise the stretch position at the bottom of every movement",
+    "Control the negative (eccentric) on every rep",
+    "Full range of motion where injury allows",
+    "Mind-muscle connection over ego lifting"
+  ],
+  "injuries": {
+    "left_knee": {
+      "severity": "severe",
+      "triggers": ["deep knee flexion", "high intensity cardio", "heavy load without warmup"],
+      "mandatory": ["knee sleeves for all leg work", "thorough warmup before heavy sets"]
+    }
+  }
+}
