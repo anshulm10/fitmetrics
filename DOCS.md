@@ -123,11 +123,19 @@ fit_support/
 │   ├── processed/               # Validated clean CSVs (output of ingestion)
 │   ├── chroma/                  # Persistent ChromaDB vector store (gitignored)
 │   └── eval/
-│       ├── results.csv          # Evaluation output
+│       ├── results.csv          # Per-query × condition evaluation log
+│       ├── family_results.csv   # Aggregated metrics by query family (from harness)
 │       └── rejected_rows.csv    # Rows that failed ingestion validation
+├── reports/
+│   └── figures/                 # Publication PNGs (from scripts/generate_report_figures.py)
+├── scripts/
+│   ├── generate_report_figures.py  # Figures 1–3 for reports (reads eval CSVs)
+│   ├── plot_results.py             # Quick plots → data/eval/*.png
+│   └── refactor_lift_workout_data.py
 ├── src/
 │   ├── agent/
-│   │   ├── graph.py             # LangGraph StateGraph + Ollama integration
+│   │   ├── graph.py             # LangGraph StateGraph + LLM integration
+│   │   ├── muscle_filter.py     # Optional exercise-context filtering
 │   │   ├── router.py            # Rule-based query classifier
 │   │   ├── state.py             # AgentState TypedDict
 │   │   └── tools.py             # InjuryMemoryTool, StrengthProgressionTool
@@ -144,7 +152,9 @@ fit_support/
 │   │   ├── preprocess.py
 │   │   └── validators.py
 │   ├── retrieval/
-│   │   └── search.py
+│   │   ├── search.py
+│   │   ├── clip_classifier.py   # CLIP zero-shot labels for image path
+│   │   └── vector_store.py
 │   └── config.py                # Typed config loader (lru_cache)
 ├── tests/
 │   └── benchmark_queries.json
@@ -525,43 +535,66 @@ Module: `src/evaluation/run_evaluation.py`
 ### Benchmark
 
 - File: `tests/benchmark_queries.json`
-- 11 queries covering all four route types.
+- **8** queries (two per route type where applicable: `factual_retrieval`, `cross_modal`, `analytical`, `personalized_followup`).
 
 ### Conditions (ablation)
 
 | Condition | Description |
 |---|---|
 | `plain_llm_baseline` | No retrieval; LLM answers from parametric knowledge only |
-| `text_only_retrieval` | Chroma `fitness_text` search only |
+| `text_only_retrieval` | Chroma text search (+ image NN for cross-modal items), then a direct LLM call (no full LangGraph) |
 | `full_multimodal_agent` | Full graph: routing + text + image + injury + progression |
-| `ablation_no_injury` | Full agent minus injury context (isolates injury contribution) |
+| `ablation_no_injury` | Same graph and tools **except** injury routing and injury tools stripped (isolates injury contribution) |
 
 ### Metrics
 
-| Metric | Description |
+| Column | Description |
 |---|---|
-| `Recall@3` | Proportion of expected exercise names in top-3 retrieved records |
-| `Response relevance (1–5)` | Heuristic derived from Recall@3 |
-| `Personalization score (1–5)` | Rewards use of strength/injury/image evidence |
-| `Latency (ms)` | Wall-clock time per query per condition |
+| `recall_at_k` / `mrr` | Retrieval quality vs benchmark `relevant_ids` (top-3) |
+| `relevance_score` (1–5) | **Heuristic** tied to retrieval recall (not an LLM judge) |
+| `personalization_score` (1–5) | Heuristic from record-type mix and query category |
+| `groundedness_score` (1–5) | Heuristic: share of retrieved exercise names echoed in `final_response` |
+| `latency_ms` | Wall-clock end-to-end for that condition (includes eval LLM calls) |
 
-### Latest results
+See the module docstring in `run_evaluation.py` for exact rules.
 
-| Condition | Recall@3 | Relevance | Personalization | Latency ms |
-|---|---:|---:|---:|---:|
-| Plain LLM baseline | 0.000 | 2.000 | 1.000 | 0 |
-| Text-only retrieval | 0.606 | 3.818 | 3.000 | 46 |
-| Full multimodal agent | 0.636 | 3.909 | 4.455 | 118 |
+### Outputs
 
-The full agent gains +5% Recall@3 and +1.5 personalization points over text-only
-at the cost of ~72 ms additional latency from extra parallel tool calls.
+| Path | Description |
+|---|---|
+| `data/eval/results.csv` | One row per query × condition (8 × 4 = **32** rows) |
+| `data/eval/family_results.csv` | Mean metrics **by query family** × condition |
 
-### LLM-as-judge
+### Macro means (current `results.csv` on disk)
 
-Scores were produced by the same Ollama model used for generation.
-**Known limitation:** the judge and generation model share an architecture,
-which may inflate scores through self-preference bias. Future work should use a
-separate judge model or human raters.
+Means over all **8** queries per system (regenerate after any model/index change):
+
+| Condition | Recall@3 | MRR | Relevance | Personalization | Groundedness | Latency (ms) |
+|---|---:|---:|---:|---:|---:|---:|
+| `plain_llm_baseline` | 0.000 | 0.000 | 2.000 | 1.000 | 1.000 | 6790 |
+| `text_only_retrieval` | 0.792 | 0.875 | 4.375 | 3.000 | 3.500 | 6962 |
+| `full_multimodal_agent` | 0.833 | 0.875 | 4.500 | 4.625 | 4.125 | 31204 |
+| `ablation_no_injury` | 0.833 | 0.875 | 4.500 | 4.625 | 3.875 | 16479 |
+
+On this small suite, **text-only** and **full** / **ablation** share the same mean Recall@3 and MRR; full multimodal shows higher mean **groundedness** than text-only and ablation at the cost of **higher latency** (full graph + tools). Numbers above are rounded for readability; CSVs are authoritative.
+
+### Report figures
+
+```bash
+uv run python scripts/generate_report_figures.py
+```
+
+Writes 300 DPI PNGs under `reports/figures/` (overall system comparison, per-family Recall@3/MRR, ablation vs full). Optional qualitative table: add `--with-failure-table`.
+
+For simpler charts written next to the CSVs:
+
+```bash
+uv run python scripts/plot_results.py
+```
+
+### Optional LLM-as-judge
+
+The default CSV columns are **not** from a separate judge model. README **Appendix A** documents a prompt suitable for a **follow-on** human or LLM judge study if you add a second scoring pass. If you do, use a different model than the generator where possible to limit self-preference bias.
 
 ### Ground truth
 
@@ -597,7 +630,7 @@ Steps executed in order:
 1. Load and validate `config/config.yaml`
 2. Run data ingestion pipeline → `data/processed/*.csv`
 3. Rebuild ChromaDB index → `data/chroma/`
-4. Run 4-condition evaluation → `data/eval/results.csv`
+4. Run 4-condition evaluation → `data/eval/results.csv` and `data/eval/family_results.csv`
 5. Print results summary table
 
 ### Expected outputs
@@ -609,7 +642,8 @@ Steps executed in order:
 | `data/processed/workouts_clean.csv` | Validated session logs |
 | `data/processed/injuries_clean.csv` | Validated injury records |
 | `data/chroma/` | Persistent ChromaDB (gitignored; rebuilt from raw) |
-| `data/eval/results.csv` | 44 rows (11 queries × 4 conditions) |
+| `data/eval/results.csv` | 32 rows (8 benchmark queries × 4 conditions) |
+| `data/eval/family_results.csv` | Aggregated means by query family × condition |
 
 ---
 
@@ -621,7 +655,7 @@ Steps executed in order:
 |---|---|
 | 1 | **Small dataset** — 63 text records, 21 images. Retrieval diversity is constrained. |
 | 2 | **Self-defined ground truth** — Recall@k labels have annotator bias. |
-| 3 | **LLM judge bias** — generation and judge share an architecture. |
+| 3 | **Optional judge bias** — if you add an LLM judge pass (README Appendix A), prefer a model distinct from the generator to limit self-preference. |
 | 4 | **No reranker** — pure vector search occasionally surfaces adjacent-but-irrelevant results. |
 | 5 | **Eager model loading** — `EmbeddingService` loads models at import time; lazy/cached loading would reduce CLI startup latency. |
 | 6 | **No persistent cross-session memory** — `conversation_history` is held in Streamlit session state only; cleared on browser refresh. |

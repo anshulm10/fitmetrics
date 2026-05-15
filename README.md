@@ -32,28 +32,32 @@ Paths under `data/raw/` and cleaned snapshots under `data/processed/`; vectors l
 
 ## Evaluation Results
 
-Aggregated metrics by query family and system condition (`data/eval/family_results.csv`):
+Per-query outputs: `data/eval/results.csv` (one row per benchmark query × system). Aggregates by query family: `data/eval/family_results.csv` (written when you run the harness). The table below is copied from the current `family_results.csv` on disk.
 
 | category | system_name | recall_at_k | mrr | relevance_score | personalization_score | groundedness_score | latency_ms |
-|----------|---------------|------------:|----:|----------------:|----------------------:|-------------------:|-----------:|
-| analytical | ablation_no_injury | 0.333 | 0.5 | 3.0 | 5.0 | 4.5 | 17314.135 |
-| analytical | full_multimodal_agent | 0.333 | 0.5 | 3.0 | 5.0 | 4.5 | 21261.605 |
-| analytical | plain_llm_baseline | 0.0 | 0.0 | 2.0 | 1.0 | 1.0 | 0.0 |
-| analytical | text_only_retrieval | 0.333 | 0.5 | 3.0 | 3.0 | 2.0 | 19.86 |
-| cross_modal | ablation_no_injury | 1.0 | 1.0 | 5.0 | 5.0 | 4.5 | 27263.38 |
-| cross_modal | full_multimodal_agent | 1.0 | 1.0 | 5.0 | 5.0 | 4.5 | 28230.865 |
-| cross_modal | plain_llm_baseline | 0.0 | 0.0 | 2.0 | 1.0 | 1.0 | 0.0 |
-| cross_modal | text_only_retrieval | 1.0 | 1.0 | 5.0 | 3.0 | 2.0 | 221.0 |
-| factual_retrieval | ablation_no_injury | 1.0 | 1.0 | 5.0 | 3.5 | 3.0 | 13439.54 |
-| factual_retrieval | full_multimodal_agent | 1.0 | 1.0 | 5.0 | 3.5 | 3.5 | 16542.6 |
-| factual_retrieval | plain_llm_baseline | 0.0 | 0.0 | 2.0 | 1.0 | 1.0 | 0.005 |
-| factual_retrieval | text_only_retrieval | 1.0 | 1.0 | 5.0 | 3.0 | 2.0 | 47.945 |
-| personalized_followup | ablation_no_injury | 1.0 | 1.0 | 5.0 | 5.0 | 4.5 | 16518.81 |
-| personalized_followup | full_multimodal_agent | 1.0 | 1.0 | 5.0 | 5.0 | 4.5 | 21942.415 |
-| personalized_followup | plain_llm_baseline | 0.0 | 0.0 | 2.0 | 1.0 | 1.0 | 0.0 |
-| personalized_followup | text_only_retrieval | 0.833 | 1.0 | 4.5 | 3.0 | 2.0 | 19.95 |
+|----------|-------------|------------:|----:|----------------:|----------------------:|-------------------:|-----------:|
+| analytical | ablation_no_injury | 0.333 | 0.5 | 3.0 | 5.0 | 3.5 | 14019.81 |
+| analytical | full_multimodal_agent | 0.333 | 0.5 | 3.0 | 5.0 | 4.0 | 27002.78 |
+| analytical | plain_llm_baseline | 0.0 | 0.0 | 2.0 | 1.0 | 1.0 | 6041.79 |
+| analytical | text_only_retrieval | 0.333 | 0.5 | 3.0 | 3.0 | 3.0 | 7153.385 |
+| cross_modal | ablation_no_injury | 1.0 | 1.0 | 5.0 | 5.0 | 4.0 | 27066.57 |
+| cross_modal | full_multimodal_agent | 1.0 | 1.0 | 5.0 | 5.0 | 4.5 | 44742.53 |
+| cross_modal | plain_llm_baseline | 0.0 | 0.0 | 2.0 | 1.0 | 1.0 | 4826.855 |
+| cross_modal | text_only_retrieval | 1.0 | 1.0 | 5.0 | 3.0 | 4.5 | 7987.515 |
+| factual_retrieval | ablation_no_injury | 1.0 | 1.0 | 5.0 | 3.5 | 3.0 | 10836.935 |
+| factual_retrieval | full_multimodal_agent | 1.0 | 1.0 | 5.0 | 3.5 | 3.0 | 24056.98 |
+| factual_retrieval | plain_llm_baseline | 0.0 | 0.0 | 2.0 | 1.0 | 1.0 | 10209.85 |
+| factual_retrieval | text_only_retrieval | 1.0 | 1.0 | 5.0 | 3.0 | 3.0 | 5731.135 |
+| personalized_followup | ablation_no_injury | 1.0 | 1.0 | 5.0 | 5.0 | 5.0 | 13993.345 |
+| personalized_followup | full_multimodal_agent | 1.0 | 1.0 | 5.0 | 5.0 | 5.0 | 29013.29 |
+| personalized_followup | plain_llm_baseline | 0.0 | 0.0 | 2.0 | 1.0 | 1.0 | 6080.33 |
+| personalized_followup | text_only_retrieval | 0.833 | 1.0 | 4.5 | 3.0 | 3.5 | 6977.16 |
 
-Benchmark queries live in `tests/benchmark_queries.json`; the evaluation driver is `src/evaluation/run_evaluation.py`. The **plain** and **text-only** conditions each perform a **real LLM completion** (no LangGraph for plain; no full graph for text-only) so `final_response` and groundedness heuristics are meaningful; the **ablation** condition disables **injury** in both the compiled graph routing and the tool merge used for metrics.
+**Macro means over all 8 benchmark queries** (from `results.csv`): the plain baseline achieves **0** mean Recall@3; **full multimodal** and **ablation_no_injury** reach **0.833** mean Recall@3 and **0.875** MRR on this suite, slightly ahead of **text-only** (**0.792** Recall@3). Full multimodal has the highest mean **groundedness** among the retrieval conditions at the cost of the highest mean **latency**. Re-run `uv run python src/evaluation/run_evaluation.py` (or `run_all.py`) after any model or index change, then refresh tables from the CSVs if you edit the docs for a paper build.
+
+**Report figures:** `uv run python scripts/generate_report_figures.py` writes 300 DPI PNGs to `reports/figures/` (overall system comparison, per-family Recall@3/MRR, ablation full vs no-injury). For quick charts under `data/eval/`, use `uv run python scripts/plot_results.py`.
+
+Benchmark queries live in `tests/benchmark_queries.json` (**8** items). The evaluation driver is `src/evaluation/run_evaluation.py`. The **plain** and **text-only** conditions each perform a **real LLM completion** (no LangGraph for plain; no full graph for text-only) so `final_response` and groundedness heuristics are meaningful; the **ablation** condition disables **injury** in both the compiled graph routing and the tool merge used for metrics.
 
 ## Reproducibility
 
@@ -63,7 +67,7 @@ uv run python run_all.py
 uv run streamlit run ui/app.py --server.maxUploadSize 10
 ```
 
-Python version is pinned in `.python-version`. Commit `uv.lock` is authoritative; use `uv sync` (not ad-hoc `pip install`) for a reproducible environment. A quick graph smoke test: `uv run python test_agent.py`.
+Python version is pinned in `.python-version`. Commit `uv.lock` is authoritative; use `uv sync` (not ad-hoc `pip install`) for a reproducible environment. A quick graph smoke test: `uv run python test_agent.py`. Evaluation only: `uv run python src/evaluation/run_evaluation.py`. Report figures: `uv run python scripts/generate_report_figures.py`.
 
 ## Appendix A: Optional LLM-as-judge prompt
 
