@@ -53,7 +53,7 @@ Aggregated metrics by query family and system condition (`data/eval/family_resul
 | personalized_followup | plain_llm_baseline | 0.0 | 0.0 | 2.0 | 1.0 | 1.0 | 0.0 |
 | personalized_followup | text_only_retrieval | 0.833 | 1.0 | 4.5 | 3.0 | 2.0 | 19.95 |
 
-Benchmark queries live in `tests/benchmark_queries.json`; the evaluation driver is `src/evaluation/run_evaluation.py`.
+Benchmark queries live in `tests/benchmark_queries.json`; the evaluation driver is `src/evaluation/run_evaluation.py`. The **plain** and **text-only** conditions each perform a **real LLM completion** (no LangGraph for plain; no full graph for text-only) so `final_response` and groundedness heuristics are meaningful; the **ablation** condition disables **injury** in both the compiled graph routing and the tool merge used for metrics.
 
 ## Reproducibility
 
@@ -65,9 +65,11 @@ uv run streamlit run ui/app.py --server.maxUploadSize 10
 
 Python version is pinned in `.python-version`. Commit `uv.lock` is authoritative; use `uv sync` (not ad-hoc `pip install`) for a reproducible environment. A quick graph smoke test: `uv run python test_agent.py`.
 
-## Appendix A: LLM Judge Prompt
+## Appendix A: Optional LLM-as-judge prompt
 
-The following prompt was used to evaluate `relevance_score` and `personalization_score` for each system response.
+The harness in `src/evaluation/run_evaluation.py` writes **relevance_score** from retrieval recall and **personalization_score** / **groundedness_score** from deterministic heuristics (see the module docstring). The prompt below is suitable for a **separate** human or LLM judge study; it is **not** what the CSV columns are computed from unless you add a second scoring pass.
+
+The following prompt was designed to evaluate `relevance_score` and `personalization_score` for each system response **if** you run an external judge:
 
 ```
 You are an expert fitness coach and evaluation assistant.
@@ -96,7 +98,7 @@ relevance_score: <int>
 personalization_score: <int>
 ```
 
-**Methodology notes:** Scores were produced by a local judge (e.g. Llama 3.1 8B via Ollama) per query, with no conversation history, using the same prompt across system conditions. Scores are integers 1–5. A limitation is possible **self-preference bias** when the judge shares an architecture with the generator; future work could use a separate judge model or human raters.
+**Methodology notes:** The CSV **relevance_score**, **personalization_score**, and **groundedness_score** columns come from the deterministic rules in `run_evaluation.py` (see that file’s module docstring). Appendix A is for an **optional** separate judge run (human or LLM), not the automated table. If you add a judge pass, use the same prompt across conditions; watch for self-preference if the judge model matches the generator.
 
 ## Appendix B: Ground Truth Construction
 
@@ -112,7 +114,7 @@ Ground truth relevance labels for Recall@k were defined manually by the author p
 
 3. **Single-domain, single-user style data** — Results may not generalize to other sports or populations.
 
-4. **LLM-as-judge** — Automated scoring can drift or align with generator stylistic biases (Appendix A).
+4. **Optional LLM judge** — The default CSV scores are heuristics; a separate judge study (Appendix A) would introduce its own bias trade-offs.
 
 5. **No cross-encoder reranking** — First-stage vector retrieval can surface semantically adjacent but wrong exercises; a reranker would be a natural upgrade.
 

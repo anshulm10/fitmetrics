@@ -40,6 +40,7 @@ if str(ROOT) not in sys.path:
 
 load_dotenv(ROOT / ".env")
 
+from src.agent.muscle_filter import filter_exercise_context_records
 from src.agent.router import QueryRoute, QueryRouter
 from src.agent.state import AgentState
 from src.agent.tools import InjuryMemoryTool, StrengthProgressionTool
@@ -430,6 +431,10 @@ def _build_user_prompt(state: AgentState) -> str:
         )
 
     image_context = state.get("retrieved_image_context", []) if state.get("show_images") else []
+    gen_text = state.get("generation_retrieved_text")
+    text_ctx = (
+        gen_text if gen_text is not None else (state.get("retrieved_text_context") or [])
+    )
     matched_exercise_name = (state.get("matched_exercise_name") or "").strip()
 
     # Known working weights derived from the user's lift history — used as
@@ -475,7 +480,7 @@ def _build_user_prompt(state: AgentState) -> str:
 
     parts.append(
         f"Query: {state['query']}\n\n"
-        f"Retrieved exercises:\n{_fmt(state.get('retrieved_text_context', []))}\n\n"
+        f"Retrieved exercises:\n{_fmt(text_ctx)}\n\n"
         f"User's personal bests for relevant exercises:\n"
         f"{_fmt(progression_display)}\n\n"
         f"Use these exact numbers when recommending weight. "
@@ -557,6 +562,7 @@ def text_retrieval_node(state: AgentState) -> dict:
 
     return {
         "retrieved_text_context": _extract_docs(records),
+        "exercise_context_records": records,
         "retrieved_image_context": image_docs,
         "node_timings": {"text_retrieval": (time.perf_counter() - t0) * 1000},
         "tool_calls_log": ["text_retrieval"],
@@ -570,6 +576,7 @@ def image_retrieval_node(state: AgentState) -> dict:
     if not path:
         return {
             "retrieved_image_context": [],
+            "exercise_context_records": [],
             "show_images": False,
             "matched_exercise_name": None,
             "identified_exercise": None,
@@ -598,6 +605,7 @@ def image_retrieval_node(state: AgentState) -> dict:
             )
             return {
                 "retrieved_text_context": _extract_docs(text_recs),
+                "exercise_context_records": list(text_recs) + list(img_recs),
                 "retrieved_image_context": _extract_docs(img_recs),
                 "show_images": True,
                 "matched_exercise_name": nn_exercise,
@@ -628,6 +636,7 @@ def image_retrieval_node(state: AgentState) -> dict:
         )
         return {
             "retrieved_text_context": _extract_docs(text_recs),
+            "exercise_context_records": list(text_recs) + list(img_recs),
             "retrieved_image_context": _extract_docs(img_recs),
             "show_images": True,
             "matched_exercise_name": identified_exercise,
@@ -646,6 +655,7 @@ def image_retrieval_node(state: AgentState) -> dict:
     if not records:
         return {
             "retrieved_image_context": [],
+            "exercise_context_records": [],
             "show_images": True,
             "matched_exercise_name": "",
             "identified_exercise": None,
@@ -671,6 +681,7 @@ def image_retrieval_node(state: AgentState) -> dict:
     if fallback_score < _CLIP_CONFIDENCE_THRESHOLD:
         return {
             "retrieved_image_context": [],
+            "exercise_context_records": [],
             "show_images": False,
             "matched_exercise_name": "",
             "identified_exercise": None,
@@ -686,6 +697,7 @@ def image_retrieval_node(state: AgentState) -> dict:
 
     return {
         "retrieved_image_context": _extract_docs(records),
+        "exercise_context_records": list(records),
         "show_images": True,
         "matched_exercise_name": fallback_exercise,
         "identified_exercise": fallback_exercise,
@@ -741,6 +753,10 @@ def context_fusion_node(state: AgentState) -> dict:
     exact-filter lift-record lookup here (rather than in progression_analysis_node,
     which runs in parallel with image_retrieval_node and therefore cannot read
     the matched_exercise_name that image_retrieval_node writes).
+
+    Applies muscle-group metadata filtering on merged ``exercise_context_records``
+    when the query names hamstrings, quads, chest, or back (training sense), then
+    sets ``generation_retrieved_text`` for the generation prompt.
     """
     t0 = time.perf_counter()
     result: dict = {
@@ -761,6 +777,13 @@ def context_fusion_node(state: AgentState) -> dict:
         if records:
             result["progression_context"] = _extract_docs(records)
         # If empty, _build_user_prompt will emit the "no personal best" message.
+
+    raw_exercise = list(state.get("exercise_context_records") or [])
+    filtered = filter_exercise_context_records(state["query"], raw_exercise)
+    gen_docs = _extract_docs(filtered)
+    if not gen_docs and raw_exercise:
+        gen_docs = _extract_docs(raw_exercise)
+    result["generation_retrieved_text"] = gen_docs
 
     result["node_timings"]["context_fusion"] = (time.perf_counter() - t0) * 1000
     return result
@@ -818,6 +841,8 @@ def route_by_query_type(state: AgentState) -> list[str]:
     if qt == QueryRoute.ANALYTICAL:
         return ["text_retrieval", "progression_analysis"]
     if qt == QueryRoute.PERSONALIZED_FOLLOWUP:
+        if state.get("skip_injury_lookup"):
+            return ["text_retrieval", "progression_analysis"]
         if _has_injury_keywords(query):
             return ["text_retrieval", "progression_analysis", "injury_lookup"]
         return ["text_retrieval", "progression_analysis"]
@@ -867,6 +892,8 @@ def run_graph(
     query: str,
     image_path: str | None = None,
     conversation_history: list[dict] | None = None,
+    *,
+    skip_injury_lookup: bool = False,
 ) -> AgentState:
     """Run the compiled graph for a single query and return the final AgentState.
 
@@ -879,12 +906,16 @@ def run_graph(
     conversation_history : list[dict] | None
         Recent chat exchanges for follow-up context, e.g. the last 3 pairs of
         {"role": "user"|"assistant", "content": "..."} dicts.
+    skip_injury_lookup : bool
+        Evaluation / ablation flag: skip ``injury_lookup`` in the graph.
     """
     initial: AgentState = {
         "query": query,
         "query_type": "",
         "image_path": image_path,
         "retrieved_text_context": [],
+        "exercise_context_records": [],
+        "generation_retrieved_text": None,
         "retrieved_image_context": [],
         "show_images": False,
         "matched_exercise_name": None,
@@ -898,6 +929,7 @@ def run_graph(
         "tool_calls_log": [],
         "final_response": "",
         "conversation_history": conversation_history or [],
+        "skip_injury_lookup": skip_injury_lookup,
     }
     t0 = time.perf_counter()
     state = compiled_graph.invoke(initial)
@@ -913,6 +945,8 @@ def run_graph_with_model(
     image_path: str | None = None,
     top_k: int | None = None,
     conversation_history: list[dict] | None = None,
+    *,
+    skip_injury_lookup: bool = False,
 ) -> AgentState:
     """Run the graph with a specific LLM model (and optional top_k override).
 
@@ -933,11 +967,18 @@ def run_graph_with_model(
         Override retrieval depth; None keeps cfg.retrieval.top_k.
     conversation_history : list[dict] | None
         Recent chat exchanges for follow-up context.
+    skip_injury_lookup : bool, optional
+        When True, the graph never schedules ``injury_lookup`` (evaluation ablation).
     """
     set_active_model(model)
     set_top_k_override(top_k)
     try:
-        return run_graph(query, image_path=image_path, conversation_history=conversation_history)
+        return run_graph(
+            query,
+            image_path=image_path,
+            conversation_history=conversation_history,
+            skip_injury_lookup=skip_injury_lookup,
+        )
     finally:
         set_active_model(None)
         set_top_k_override(None)

@@ -1,152 +1,87 @@
 query_id,category,system_name,query_type,query,relevant_ids,retrieved_top3,recall_at_k,mrr,personalization_score,relevance_score,groundedness_score,latency_ms,tool_calls_count,final_response,model
-factual_001,factual_retrieval,plain_llm_baseline,personalized_followup,what is my best weight on hack squat?,hack_squat,Generic coaching advice for,0.0,0.0,1,2,1,0.0,0,,qwen2.5:7b
-factual_001,factual_retrieval,text_only_retrieval,personalized_followup,what is my best weight on hack squat?,hack_squat,Hack Squat|Back Squat|Hip Thrust,1.0,1.0,3,5,2,58.06,1,,qwen2.5:7b
-factual_001,factual_retrieval,full_multimodal_agent,personalized_followup,what is my best weight on hack squat?,hack_squat,Hack Squat|Back Squat|Hip Thrust,1.0,1.0,4,5,3,15292.0,5,"Your best on hack squat is 140kg for 6 reps. For today's session, let's keep that in mind and try to hit 142.5kg if you feel strong. If not, stick with your personal baseline of 140kg to ensure form remains top-notch.",qwen2.5:7b
-factual_001,factual_retrieval,ablation_no_injury,personalized_followup,what is my best weight on hack squat?,hack_squat,Hack Squat|Back Squat|Hip Thrust,1.0,1.0,4,5,3,12583.05,5,"Your best weight on hack squat is 140kg for 6 reps. For today's session, try increasing that by about 2% to challenge yourself—so aim for 142.5kg for 6 reps. If you feel strong, you can go up to 145kg for 5 reps. Stay within your limits and focus on form.",qwen2.5:7b
-factual_002,factual_retrieval,plain_llm_baseline,factual_retrieval,what muscles does lat pulldown work?,lat_pulldown,Generic coaching advice for,0.0,0.0,1,2,1,0.01,0,,qwen2.5:7b
-factual_002,factual_retrieval,text_only_retrieval,factual_retrieval,what muscles does lat pulldown work?,lat_pulldown,Lat Pulldown|Pull Ups|Seated Cable Row,1.0,1.0,3,5,2,37.83,1,,qwen2.5:7b
-factual_002,factual_retrieval,full_multimodal_agent,factual_retrieval,what muscles does lat pulldown work?,lat_pulldown,Lat Pulldown|Pull Ups|Seated Cable Row,1.0,1.0,3,5,4,17793.2,5,"I'm FitSupport, your personal training assistant. Ask me things like:
+factual_001,factual_retrieval,plain_llm_baseline,factual_retrieval,what is my best weight on hack squat?,hack_squat,Generic coaching advice for,0.0,0.0,1,2,1,15626.04,0,"I don't have access to your workout logs, so I can't determine your personal best for the hack squat. To find your best weight, focus on consistent form and gradually increasing the weight you lift safely over time. Consult with a fitness professional if needed for personalized guidance.",qwen2.5:7b
+factual_001,factual_retrieval,text_only_retrieval,factual_retrieval,what is my best weight on hack squat?,hack_squat,Hack Squat|Back Squat|Hip Thrust,1.0,1.0,3,5,3,5855.37,1,Your best weight on hack squat is 140 kg.,qwen2.5:7b
+factual_001,factual_retrieval,full_multimodal_agent,personalized_followup,what is my best weight on hack squat?,hack_squat,Hack Squat|Back Squat|Hip Thrust,1.0,1.0,4,5,3,23041.58,5,"Your best on hack squat is 140kg for 6 reps. For today's session, try to hit 142.5kg if you feel strong, or maintain the same weight and focus on perfect form.",qwen2.5:7b
+factual_001,factual_retrieval,ablation_no_injury,personalized_followup,what is my best weight on hack squat?,hack_squat,Hack Squat|Back Squat|Hip Thrust,1.0,1.0,4,5,3,10386.46,5,"Your best on hack squat is 140kg for 6 reps. For today's session, try 142.5kg for 6 reps to build on that personal best.",qwen2.5:7b
+factual_002,factual_retrieval,plain_llm_baseline,factual_retrieval,what muscles does lat pulldown work?,lat_pulldown,Generic coaching advice for,0.0,0.0,1,2,1,4793.66,0,"The lat pulldown primarily targets the latissimus dorsi muscles, along with assisting from the biceps, rhomboids, and rear deltoid muscles.",qwen2.5:7b
+factual_002,factual_retrieval,text_only_retrieval,factual_retrieval,what muscles does lat pulldown work?,lat_pulldown,Lat Pulldown|Pull Ups|Seated Cable Row,1.0,1.0,3,5,3,5606.9,1,The lat pulldown primarily works the lats and biceps. It also engages the core for stability.,qwen2.5:7b
+factual_002,factual_retrieval,full_multimodal_agent,factual_retrieval,what muscles does lat pulldown work?,lat_pulldown,Lat Pulldown|Pull Ups|Seated Cable Row,1.0,1.0,3,5,3,25072.38,5,"Your lat pulldown best is 72kg for 6 reps. For today's session, let’s focus on your lats and biceps with that weight range. Try starting with 72kg for 5-6 reps to hit those muscles effectively. If you feel strong, consider adding a slight increase to 73kg for your second set.",qwen2.5:7b
+factual_002,factual_retrieval,ablation_no_injury,factual_retrieval,what muscles does lat pulldown work?,lat_pulldown,Lat Pulldown|Pull Ups|Seated Cable Row,1.0,1.0,3,5,3,11287.41,5,"Your lat pulldown personal best is at 72kg for 6 reps. For today's session, you can stick around that weight range and aim for the same rep scheme. Focus on proper form to engage those lats effectively. Pair it with some hip thrusts to balance out your workout and work those glutes.",qwen2.5:7b
+cross_modal_001,cross_modal,plain_llm_baseline,cross_modal,what exercise is shown in this image and what is my best on it?,hack_squat,Generic coaching advice for,0.0,0.0,1,2,1,5135.98,0,"I'm sorry, but I can't see any images here. To help you identify the exercise and determine your best one, please describe the image or tell me more about your workout routine.",qwen2.5:7b
+cross_modal_001,cross_modal,text_only_retrieval,cross_modal,what exercise is shown in this image and what is my best on it?,hack_squat,Hack Squat|Hack Squat|Hack Squat,1.0,1.0,3,5,4,8682.78,2,The image shows a hack squat exercise. Your best score on this exercise is not mentioned in the snippets provided.,qwen2.5:7b
+cross_modal_001,cross_modal,full_multimodal_agent,cross_modal,what exercise is shown in this image and what is my best on it?,hack_squat,Hack Squat|Hack Squat|Hack Squat,1.0,1.0,5,5,4,47204.08,5,"I'm FitSupport, your personal training assistant. I know your workout history, personal bests, and injury context. Ask me things like:
 - What weight should I use for hack squat today?
-- My knee hurts, what can I train?
+- My body hurts, what can I train safely?
 - [upload an image] What exercise is this and what's my best on it?
 - I did chest yesterday, what should I train today?
 
-Your lat pulldown best is 72kg x 6. For your next set, try 73.5kg for 5 reps to maintain progression. To balance out your workout, consider adding seated cable rows too. These will target your lats and rhomboids effectively.",qwen2.5:7b
-factual_002,factual_retrieval,ablation_no_injury,factual_retrieval,what muscles does lat pulldown work?,lat_pulldown,Lat Pulldown|Pull Ups|Seated Cable Row,1.0,1.0,3,5,3,14296.03,5,"I'm FitSupport, your personal training assistant. I know your workout history, personal bests, and injury context. Ask me things like:
+You are performing a Hack Squat in the image. Your best on this is 140kg for 6 reps. For today, you can try increasing that by 2.5kg to 142.5kg, but ensure your form is perfect and focus on controlled movements. If needed, we can adjust further based on how you feel during the session.",qwen2.5:7b
+cross_modal_001,cross_modal,ablation_no_injury,cross_modal,what exercise is shown in this image and what is my best on it?,hack_squat,Hack Squat|Hack Squat|Hack Squat,1.0,1.0,5,5,4,27660.72,5,"I'm FitSupport, your personal training assistant. I know your workout history, personal bests, and injury context. Ask me things like:
 - What weight should I use for hack squat today?
-- My knee hurts, what can I train?
+- My body hurts, what can I train safely?
 - [upload an image] What exercise is this and what's my best on it?
 - I did chest yesterday, what should I train today?
 
-Based on your personal bests, the lat pulldown works primarily the lats and biceps. For today, you hit 72kg for 6 reps so try increasing that by about 3.5kg to 75.5kg today. This will help strengthen your back muscles while keeping things progressive.",qwen2.5:7b
-cross_modal_001,cross_modal,plain_llm_baseline,cross_modal,what exercise is shown in this image and what is my best on it?,hack_squat,Generic coaching advice for,0.0,0.0,1,2,1,0.0,0,,qwen2.5:7b
-cross_modal_001,cross_modal,text_only_retrieval,cross_modal,what exercise is shown in this image and what is my best on it?,hack_squat,Hack Squat|Hack Squat|Hack Squat,1.0,1.0,3,5,2,285.1,2,,qwen2.5:7b
-cross_modal_001,cross_modal,full_multimodal_agent,cross_modal,what exercise is shown in this image and what is my best on it?,hack_squat,Hack Squat|Hack Squat|Hack Squat,1.0,1.0,5,5,4,29448.61,5,"I'm FitSupport, your personal training assistant. I know your workout history, personal bests, and injury context. Ask me things like:
-- What weight should I use for hack squat today?
-- My knee hurts, what can I train?
-- [upload an image] What exercise is this and what's my best on it?
-- I did chest yesterday, what should I train today?
+Based on the image, you're performing a Hack Squat. Your personal best for Hack Squat is 140kg x 6 reps. For today, try to hit that number again or slightly increase by 2.5kg to challenge yourself — go for 142.5kg x 6 reps if you feel up to it.",qwen2.5:7b
+cross_modal_002,cross_modal,plain_llm_baseline,cross_modal,show me exercises similar to this movement,cable_row|lat_pulldown|seated_cable_row,Generic coaching advice for,0.0,0.0,1,2,1,4517.73,0,Sure! Can you describe the movement you're doing or mention the muscle group it targets? That will help me suggest some alternatives.,qwen2.5:7b
+cross_modal_002,cross_modal,text_only_retrieval,cross_modal,show me exercises similar to this movement,cable_row|lat_pulldown|seated_cable_row,Cable Row|Cable Row|Cable Row,1.0,1.0,3,5,5,7292.25,2,"Based on the cable row movements, exercises like backward treadmill walk and machine row might interest you. Both target different muscle groups but involve pulling motions.",qwen2.5:7b
+cross_modal_002,cross_modal,full_multimodal_agent,cross_modal,show me exercises similar to this movement,cable_row|lat_pulldown|seated_cable_row,Cable Row|Cable Row|Cable Row,1.0,1.0,5,5,5,42280.98,5,"Based on your recent Seated Cable Row performance at 80kg x 8 reps, let's add some similar exercises to challenge you further. Try the Machine Row with about 75kg for 8 reps, or the Backward Treadmill Walk for a cardio and balance boost. Both will target similar muscle groups effectively.",qwen2.5:7b
+cross_modal_002,cross_modal,ablation_no_injury,cross_modal,show me exercises similar to this movement,cable_row|lat_pulldown|seated_cable_row,Cable Row|Cable Row|Cable Row,1.0,1.0,5,5,4,26472.42,5,"You've been doing great with the Cable Row! For similar exercises, you can try these:
 
-Based on the hack squat in the image, we'll focus on your lower body. You hit 140kg for six reps last time, so try 142.5kg today. If you feel comfortable, go for those six reps or slightly less if needed to maintain proper form. 
+1. **Seated Cable Row** - This targets your lats, rhomboids, and biceps just like the cable row. Start with 80kg for weight since that's your best on this exercise.
 
-Looking forward to your progress!",qwen2.5:7b
-cross_modal_001,cross_modal,ablation_no_injury,cross_modal,what exercise is shown in this image and what is my best on it?,hack_squat,Hack Squat|Hack Squat|Hack Squat,1.0,1.0,5,5,4,25405.68,5,"I'm FitSupport, your personal training assistant. I know your workout history, personal bests, and injury context. Ask me things like:
-- What weight should I use for hack squat today?
-- My knee hurts, what can I train?
-- [upload an image] What exercise is this and what's my best on it?
-- I did chest yesterday, what should I train today?
+2. **Machine Row** - Another great horizontal pull movement targeting the same muscle groups. Begin around 80kg as well.
 
-Based on your personal best of 140kg x 6 on the hack squat, let's keep the intensity high. For today’s session, try using 142.5kg for 6 reps. If you feel strong and confident, you can aim to hit that weight or even slightly increase it. Stay consistent with your form to ensure safety and effectiveness.",qwen2.5:7b
-cross_modal_002,cross_modal,plain_llm_baseline,cross_modal,show me exercises similar to this movement,cable_row|lat_pulldown|seated_cable_row,Generic coaching advice for,0.0,0.0,1,2,1,0.0,0,,qwen2.5:7b
-cross_modal_002,cross_modal,text_only_retrieval,cross_modal,show me exercises similar to this movement,cable_row|lat_pulldown|seated_cable_row,Cable Row|Cable Row|Cable Row,1.0,1.0,3,5,2,156.9,2,,qwen2.5:7b
-cross_modal_002,cross_modal,full_multimodal_agent,cross_modal,show me exercises similar to this movement,cable_row|lat_pulldown|seated_cable_row,Cable Row|Cable Row|Cable Row,1.0,1.0,5,5,5,27013.12,5,"Based on your cable row movement, here are some similar exercises you can try:
+These will keep the focus on your back while providing variety. Enjoy your workout!",qwen2.5:7b
+analytical_001,analytical,plain_llm_baseline,analytical,"my hack squat has plateaued at 140kg and my knee is sore, what should I change about leg training this week?",hack_squat|INJ_001|leg_press,Generic coaching advice for,0.0,0.0,1,2,1,6274.15,0,Consider reducing the weight to allow your knees to recover while maintaining form. Incorporate different squat variations like front squats or pistol squats for variety. Include more quad-focused exercises like lunges or Bulgarian split squats. Ensure proper warm-up and stretching before workouts. Monitor your diet and sleep to support recovery.,qwen2.5:7b
+analytical_001,analytical,text_only_retrieval,analytical,"my hack squat has plateaued at 140kg and my knee is sore, what should I change about leg training this week?",hack_squat|INJ_001|leg_press,Hack Squat|Hack Squat|Back Squat,0.6667,1.0,3,4,3,7698.9,1,"Consider switching to back squats this week, as they can target similar muscles while providing a different training stimulus. Ensure you maintain proper form, especially focusing on knee alignment. If knees still ache, try varying the squat depth or using knee pads. Monitor your recovery and adjust volume accordingly.",qwen2.5:7b
+analytical_001,analytical,full_multimodal_agent,personalized_followup,"my hack squat has plateaued at 140kg and my knee is sore, what should I change about leg training this week?",hack_squat|INJ_001|leg_press,Hack Squat|Hack Squat|Back Squat,0.6667,1.0,5,4,4,27435.39,6,"Your hack squat has plateaued at 140kg and your knee is sore today. With your knee pain, let's keep legs out of it entirely. Here’s what you can do instead: focus on seated cable rows to hit your back hard, or lat pulldowns for a similar effect. To target your quads and glutes effectively but gently, try lying leg curls at light weight—keep it under 50kg today given the knee. Also, consider upper body push movements like incline bench press to work your chest and triceps. This will help balance out your training while allowing your quads to recover.",qwen2.5:7b
+analytical_001,analytical,ablation_no_injury,personalized_followup,"my hack squat has plateaued at 140kg and my knee is sore, what should I change about leg training this week?",hack_squat|INJ_001|leg_press,Hack Squat|Hack Squat|Back Squat,0.6667,1.0,5,4,3,13328.74,5,"With your knee pain today, let's keep legs out of it entirely. Here's what you can do instead: 
 
-1. **Machine Row**: This will target the same muscle groups—lats and rhomboids. You can start with 35–37.5 kg.
+Focus on upper body work like back squats and lat pulldowns. Start with 105kg for back squats (your best so far) and aim for 4 sets of 4 reps. For lat pulldowns, use a weight that allows good form—maybe around 35kg for 6 reps. Finish with some seated calf raises or light hip thrusts focusing on the stretch—keep it under 100kg today given the knee.",qwen2.5:7b
+analytical_002,analytical,plain_llm_baseline,analytical,"looking at my pushing movements, which muscle groups am I neglecting and what should I add?",dumbbell_shoulder_press|incline_chest_press|lateral_raise,Generic coaching advice for,0.0,0.0,1,2,1,5809.43,0,"For pushing movements, ensure you include exercises that target the chest, shoulders, and triceps. Consider adding bench presses or push-ups for the chest, military presses for the shoulders, and tricep dips or skull crushers for the triceps to balance your routine.",qwen2.5:7b
+analytical_002,analytical,text_only_retrieval,analytical,"looking at my pushing movements, which muscle groups am I neglecting and what should I add?",dumbbell_shoulder_press|incline_chest_press|lateral_raise,Cable Row|Military Press|Seated Cable Row,0.0,0.0,3,2,3,6607.87,1,"Based on the exercises you've mentioned, you are focusing heavily on pull movements with rows and neglecting push movements. Consider adding military presses to target your front deltoids, triceps, and upper chest.",qwen2.5:7b
+analytical_002,analytical,full_multimodal_agent,personalized_followup,"looking at my pushing movements, which muscle groups am I neglecting and what should I add?",dumbbell_shoulder_press|incline_chest_press|lateral_raise,Cable Row|Military Press|Seated Cable Row,0.0,0.0,5,2,4,26570.17,5,"Your pushing movements are well-rounded with Military Press and Dumbbell Incline Bench Press targeting the front deltoids, triceps, and upper chest. However, you're neglecting your lower back and biceps which are supported by Cable Row exercises but can be further strengthened.
 
-2. **Hip Thrust**: While it's more glute-focused, it uses a similar hip extension movement pattern. Use a barbell or machine at around 40–45 kg.
+To balance this out, consider adding a Barbell Bent Over Row to target the lats and rhomboids more effectively. For bicep development, you could include Hammer Curls orEZ Bar Curl at 15 kg for 8 reps. This will help ensure all pushing muscles are well-developed.",qwen2.5:7b
+analytical_002,analytical,ablation_no_injury,personalized_followup,"looking at my pushing movements, which muscle groups am I neglecting and what should I add?",dumbbell_shoulder_press|incline_chest_press|lateral_raise,Cable Row|Military Press|Seated Cable Row,0.0,0.0,5,2,4,14710.88,5,"Your pushing movements focus heavily on the front deltoids, triceps, and upper chest with the Military Press, while the Cable Row series works your lats, rhomboids, and biceps. To balance this out, I recommend adding some exercises that target your back muscles more specifically.
 
-Both exercises will complement your cable row work without straining the same muscle groups. Enjoy your workout!",qwen2.5:7b
-cross_modal_002,cross_modal,ablation_no_injury,cross_modal,show me exercises similar to this movement,cable_row|lat_pulldown|seated_cable_row,Cable Row|Cable Row|Cable Row,1.0,1.0,5,5,5,29121.08,5,"I'm FitSupport, your personal training assistant. I know your workout history, personal bests, and injury context. Ask me things like:
-- What weight should I use for hack squat today?
-- My knee hurts, what can I train?
-- [upload an image] What exercise is this and what's my best on it?
-- I did chest yesterday, what should I train today?
+For your next workout, try including Bent-Over Barbell Rows to work your lower back and rear delts. Start with 120kg for 4 sets of 6 reps. Also, add Face Pulls using a cable machine with a rope attachment for your rear deltoids and upper traps. Aim for 3 sets of 15 reps.
 
-For exercises similar to Cable Row, here are a few options based on your personal bests:
+This will help create a more balanced workout routine across all your muscle groups.",qwen2.5:7b
+personal_001,personalized_followup,plain_llm_baseline,personalized_followup,"I did hack squat and leg press today, what should I do next given my knee history?",hack_squat|leg_press|dumbbell_shoulder_press,Generic coaching advice for,0.0,0.0,1,2,1,5808.94,0,"Given your knee history, it's important to focus on low-impact exercises like cycling or swimming. Consider incorporating glute bridges and quad sets for targeted leg strengthening without strain. Always warm up properly before these sessions and listen to your body to avoid overexertion.",qwen2.5:7b
+personal_001,personalized_followup,text_only_retrieval,personalized_followup,"I did hack squat and leg press today, what should I do next given my knee history?",hack_squat|leg_press|dumbbell_shoulder_press,Hack Squat|Hack Squat|Back Squat,0.6667,1.0,3,4,3,7244.47,1,"Given your history, consider a knee-friendly variant of the back squat next. Focus on maintaining proper form to protect your knees. You might also try higher volume exercises like Bulgarian split squats or leg press for variation. Always consult with a healthcare provider before starting any new regimen.",qwen2.5:7b
+personal_001,personalized_followup,full_multimodal_agent,personalized_followup,"I did hack squat and leg press today, what should I do next given my knee history?",hack_squat|leg_press|dumbbell_shoulder_press,Leg Press|Hack Squat|Dumbbell Shoulder Press,1.0,1.0,5,5,5,27982.85,5,"Your hack squat and leg press are both heavy today, so let's keep the knee-friendly moves coming. Given your history with knee pain, we'll avoid anything that could stress those joints further.
 
-Since you have no recorded personal best for Cable Row, let's start light. Based on your bench press best of 35 kg x 6, try the Machine Row with around 21.875 kg or 26.25 kg today. This will target similar muscle groups and movement patterns.
+For your next session, focus on upper body work to balance things out. You can try back squats at a lighter weight, perhaps around 70kg for 4 reps, followed by some seated cable rows at about 60kg x 8-12 reps. This will help strengthen your upper back and improve overall posture.
 
-Alternatively, you could do some Backward Treadmill Walk for a different type of training that focuses on quads and calves while improving balance. Start at a comfortable speed to maintain form.
-
-Lastly, the Hip Thrust is another great option if you want to work your glutes and hamstrings. Aim for around 21.875 kg today to keep things manageable and effective.",qwen2.5:7b
-analytical_001,analytical,plain_llm_baseline,personalized_followup,"my hack squat has plateaued at 140kg and my knee is sore, what should I change about leg training this week?",hack_squat|INJ_001|leg_press,Generic coaching advice for,0.0,0.0,1,2,1,0.0,0,,qwen2.5:7b
-analytical_001,analytical,text_only_retrieval,personalized_followup,"my hack squat has plateaued at 140kg and my knee is sore, what should I change about leg training this week?",hack_squat|INJ_001|leg_press,Hack Squat|Hack Squat|Back Squat,0.6667,1.0,3,4,2,25.12,1,,qwen2.5:7b
-analytical_001,analytical,full_multimodal_agent,personalized_followup,"my hack squat has plateaued at 140kg and my knee is sore, what should I change about leg training this week?",hack_squat|INJ_001|leg_press,Hack Squat|Hack Squat|Back Squat,0.6667,1.0,5,4,4,18672.88,6,"Your hack squat is at 140kg and your knee is sore today. Let's focus on upper body and hip exercises to keep the pressure off your knees. For leg training this week, consider these options:
-
-- **Seated Cable Rows**: Focus on getting a good stretch in your lats and back.
-- **Lat Pulldowns**: Great for building back strength while keeping your quads out of it.
-- **Hip Thrusts (light weight)**: These will help target your glutes without putting strain on your knees.
-
-Skip the hack squat today and go light on anything knee-dominant. Push-ups or decline push-ups can be a good alternative if you need some upper body work.",qwen2.5:7b
-analytical_001,analytical,ablation_no_injury,personalized_followup,"my hack squat has plateaued at 140kg and my knee is sore, what should I change about leg training this week?",hack_squat|INJ_001|leg_press,Hack Squat|Hack Squat|Back Squat,0.6667,1.0,5,4,5,15831.49,6,"Your hack squat is at 140kg x 6 so let's focus on alternatives that are more knee-friendly today. With your knee soreness, we'll skip heavy squats and leg press entirely.
-
-For leg day this week, consider these options:
-- Back Squat: Try 95kg for 4 reps to maintain the glute engagement without stressing your knees.
-- Leg Press: Reduce to 180kg for 3 reps to keep it light and controlled.
-- Seated Cable Rows: Aim for 75kg x 6, focusing on a strong back and stable core.
-- Lat Pulldowns: Go with 50kg x 8 to engage the upper body.
-- Hip Thrusts: Use 120kg for 4 reps while ensuring proper form.
-
-These adjustments should help maintain your strength gains while keeping knee pain at bay.",qwen2.5:7b
-analytical_002,analytical,plain_llm_baseline,personalized_followup,"looking at my pushing movements, which muscle groups am I neglecting and what should I add?",dumbbell_shoulder_press|incline_chest_press|lateral_raise,Generic coaching advice for,0.0,0.0,1,2,1,0.0,0,,qwen2.5:7b
-analytical_002,analytical,text_only_retrieval,personalized_followup,"looking at my pushing movements, which muscle groups am I neglecting and what should I add?",dumbbell_shoulder_press|incline_chest_press|lateral_raise,Cable Row|Military Press|Seated Cable Row,0.0,0.0,3,2,2,14.6,1,,qwen2.5:7b
-analytical_002,analytical,full_multimodal_agent,personalized_followup,"looking at my pushing movements, which muscle groups am I neglecting and what should I add?",dumbbell_shoulder_press|incline_chest_press|lateral_raise,Cable Row|Military Press|Seated Cable Row,0.0,0.0,5,2,5,23850.33,5,"I'm FitSupport, your personal training assistant. I know your workout history, personal bests, and injury context. Ask me things like:
-- What weight should I use for hack squat today?
-- My knee hurts, what can I train?
-- [upload an image] What exercise is this and what's my best on it?
-- I did chest yesterday, what should I train today?
-
-Based on your personal bests, you've focused heavily on pushing movements but neglected some pulling actions. Your Cable Row and Seated Cable Row are great for back development, and Military Press hits the front deltoids well. However, there's more to consider:
-
-You’ve hit a 30kg Dumbbell Incline Bench Press best, which is good for upper chest and front delts but could benefit from some additional work on the lower chest and triceps.
-
-**Recommendation:**
-Let’s add some exercises that will round out your pushing movements. Consider adding Decline Dumbbell Press (targets the lower chest and triceps) using 25kg, or Flat Dumbbell Flyes for more focus on the upper chest at 18kg. This will help balance your chest development and ensure you're working all aspects of your chest muscles.
-
-Feel free to ask if you have any specific questions!",qwen2.5:7b
-analytical_002,analytical,ablation_no_injury,personalized_followup,"looking at my pushing movements, which muscle groups am I neglecting and what should I add?",dumbbell_shoulder_press|incline_chest_press|lateral_raise,Cable Row|Military Press|Seated Cable Row,0.0,0.0,5,2,4,18796.78,5,"I'm FitSupport, your personal training assistant. I know your workout history, personal bests, and injury context. Ask me things like:
-- What weight should I use for hack squat today?
-- My knee hurts, what can I train?
-- [upload an image] What exercise is this and what's my best on it?
-- I did chest yesterday, what should I train today?
-
-Based on your personal bests and the exercises you've done, you're hitting your front deltoids, triceps, upper chest, lats, rhomboids, and biceps well. However, you might be neglecting your lower back muscles (erectors) and maybe your middle back (lower traps).
-
-To address this, consider adding these exercises:
-- Barbell Deadlift: Focus on squeezing your glutes and lower back as you lift. Aim for 160kg x 8 reps.
-- Face Pulls or Seated Cable Rows with a Neutral Grip: Use about 45% of the weight from your best Dumbbell Incline Bench Press (around 17.5 kg) to work your rear delts and lower traps.
-
-This will help balance out your upper body workout and ensure all major muscle groups are being trained effectively.",qwen2.5:7b
-personal_001,personalized_followup,plain_llm_baseline,personalized_followup,"I did hack squat and leg press today, what should I do next given my knee history?",hack_squat|leg_press|dumbbell_shoulder_press,Generic coaching advice for,0.0,0.0,1,2,1,0.0,0,,qwen2.5:7b
-personal_001,personalized_followup,text_only_retrieval,personalized_followup,"I did hack squat and leg press today, what should I do next given my knee history?",hack_squat|leg_press|dumbbell_shoulder_press,Hack Squat|Hack Squat|Back Squat,0.6667,1.0,3,4,2,21.82,1,,qwen2.5:7b
-personal_001,personalized_followup,full_multimodal_agent,personalized_followup,"I did hack squat and leg press today, what should I do next given my knee history?",hack_squat|leg_press|dumbbell_shoulder_press,Leg Press|Hack Squat|Dumbbell Shoulder Press,1.0,1.0,5,5,4,21206.3,5,"I'm FitSupport, your personal training assistant. I know your workout history, personal bests, and injury context. Ask me things like:
-- What weight should I use for hack squat today?
-- My knee hurts, what can I train?
-- [upload an image] What exercise is this and what's my best on it?
-- I did chest yesterday, what should I train today?
-
-Given your workout history, you've done Hack Squat and Leg Press today. With that in mind, let's focus on areas that need attention but aren't heavily quad-dominant. How about trying seated cable rows at 50kg for 8 reps, followed by lateral raises with 20kg? This will help target your back and shoulders while giving your knees a break.",qwen2.5:7b
-personal_001,personalized_followup,ablation_no_injury,personalized_followup,"I did hack squat and leg press today, what should I do next given my knee history?",hack_squat|leg_press|dumbbell_shoulder_press,Leg Press|Hack Squat|Dumbbell Shoulder Press,1.0,1.0,5,5,4,14366.34,5,"Your hack squat and leg press are both heavy today. With your knee history, let's keep legs out of it entirely. Here’s what you can do instead: try some seated cable rows for 3 sets of 10 reps to work your back and biceps. Then move on to lat pulldowns focusing on a good grip and controlled movements for 3 sets of 8 reps. Finish with some hip thrusts at light weight, keeping it under 100kg for 3 sets of 12 reps. This should help balance out your workout without putting too much strain on your knees.",qwen2.5:7b
-personal_002,personalized_followup,plain_llm_baseline,personalized_followup,"considering my shoulder and knee issues, what is a safe full body workout for today?",dumbbell_shoulder_press|chest_supported_row|dumbbell_flat_bench_press,Generic coaching advice for,0.0,0.0,1,2,1,0.0,0,,qwen2.5:7b
-personal_002,personalized_followup,text_only_retrieval,personalized_followup,"considering my shoulder and knee issues, what is a safe full body workout for today?",dumbbell_shoulder_press|chest_supported_row|dumbbell_flat_bench_press,Dumbbell Shoulder Press|Chest Supported Row|Dumbbell Flat Bench Press,1.0,1.0,3,5,2,18.08,1,,qwen2.5:7b
-personal_002,personalized_followup,full_multimodal_agent,personalized_followup,"considering my shoulder and knee issues, what is a safe full body workout for today?",dumbbell_shoulder_press|chest_supported_row|dumbbell_flat_bench_press,Dumbbell Shoulder Press|Chest Supported Row|Dumbbell Flat Bench Press,1.0,1.0,5,5,5,22678.53,5,"I'm FitSupport, your personal training assistant. I know your workout history, personal bests, and injury context. Ask me things like:
+If you feel up for it, add in some light hip thrusts too—keep the weight under 100kg to focus on form and activation without straining your knees.",qwen2.5:7b
+personal_001,personalized_followup,ablation_no_injury,personalized_followup,"I did hack squat and leg press today, what should I do next given my knee history?",hack_squat|leg_press|dumbbell_shoulder_press,Leg Press|Hack Squat|Dumbbell Shoulder Press,1.0,1.0,5,5,5,11552.9,5,"Your hack squat and leg press are both heavy lifts targeting your quads and glutes. Given this, let's focus on areas that aren't as heavily worked today. How about some upper body work? You could try back squats at 105kg for 4 reps if you feel up to it, or maybe opt for lat pulldowns and seated cable rows instead. These will help balance out your routine while keeping your knees happy.",qwen2.5:7b
+personal_002,personalized_followup,plain_llm_baseline,personalized_followup,"considering my shoulder and knee issues, what is a safe full body workout for today?",dumbbell_shoulder_press|chest_supported_row|dumbbell_flat_bench_press,Generic coaching advice for,0.0,0.0,1,2,1,6351.72,0,"For your shoulder and knee issues, focus on low-impact exercises like swimming or cycling. Incorporate gentle strengthening with bodyweight exercises such as seated rows and leg presses at a gym, ensuring proper form. Also, consider yoga or Pilates for flexibility and core strength. Always warm up before starting and listen to your body during the workout.",qwen2.5:7b
+personal_002,personalized_followup,text_only_retrieval,personalized_followup,"considering my shoulder and knee issues, what is a safe full body workout for today?",dumbbell_shoulder_press|chest_supported_row|dumbbell_flat_bench_press,Dumbbell Shoulder Press|Chest Supported Row|Dumbbell Flat Bench Press,1.0,1.0,3,5,4,6709.85,1,"Choose the Chest Supported Row for your back muscles, and the Dumbbell Flat Bench Press for chest and triceps. Both are safe and can help with shoulder and knee issues. Focus on proper form to avoid strain.",qwen2.5:7b
+personal_002,personalized_followup,full_multimodal_agent,personalized_followup,"considering my shoulder and knee issues, what is a safe full body workout for today?",dumbbell_shoulder_press|chest_supported_row|dumbbell_flat_bench_press,Dumbbell Shoulder Press|Chest Supported Row|Dumbbell Flat Bench Press,1.0,1.0,5,5,5,30043.73,5,"I'm FitSupport, your personal training assistant. I know your workout history, personal bests, and injury context. Ask me things like:
 - What weight should I use for dumbbell shoulder press today?
-- My knee hurts, what can I train?
+- My body hurts, what can I train safely?
 - [upload an image] What exercise is this and what's my best on it?
 - I did chest yesterday, what should I train today?
 
-Considering your shoulder and knee issues, let's focus on a safe full-body workout that avoids stress on these areas. Here’s what you can do:
+With your shoulder and knee issues in mind, let's focus on safe movements. Here’s a plan:
 
-For shoulders, try the Dumbbell Shoulder Press at 25kg for 8 reps.
-For back, opt for Chest Supported Row with 30kg dumbbells or machine for 10 reps to hit your mid and rear deltoids as well.
-For chest, use Dumbbell Flat Bench Press at 35kg for 6 reps.
+For the Dumbbell Shoulder Press, try 25kg for 8 reps.
+For the Chest Supported Row, use the machine set to align with your joint path, aiming for 30kg for 8 reps.
+For the Dumbbell Flat Bench Press, go with 35kg for 6 reps.
 
-These exercises should help you maintain overall strength without overloading your shoulder or knee. Enjoy your workout!",qwen2.5:7b
-personal_002,personalized_followup,ablation_no_injury,personalized_followup,"considering my shoulder and knee issues, what is a safe full body workout for today?",dumbbell_shoulder_press|chest_supported_row|dumbbell_flat_bench_press,Dumbbell Shoulder Press|Chest Supported Row|Dumbbell Flat Bench Press,1.0,1.0,5,5,5,18671.28,5,"I'm FitSupport, your personal training assistant. I know your workout history, personal bests, and injury context. Ask me things like:
+This workout should help maintain balance across your upper body without straining those areas. Enjoy your session!",qwen2.5:7b
+personal_002,personalized_followup,ablation_no_injury,personalized_followup,"considering my shoulder and knee issues, what is a safe full body workout for today?",dumbbell_shoulder_press|chest_supported_row|dumbbell_flat_bench_press,Dumbbell Shoulder Press|Chest Supported Row|Dumbbell Flat Bench Press,1.0,1.0,5,5,5,16433.79,5,"I'm FitSupport, your personal training assistant. I know your workout history, personal bests, and injury context. Ask me things like:
 - What weight should I use for dumbbell shoulder press today?
-- My knee hurts, what can I train?
+- My body hurts, what can I train safely?
 - [upload an image] What exercise is this and what's my best on it?
 - I did chest yesterday, what should I train today?
 
-Based on your shoulder and knee issues, we'll focus on exercises that won't strain those areas. Here’s a safe full-body workout:
+With your shoulder issues, let's focus on exercises that won't strain them. For the knee, we'll keep lower body work minimal. Here’s a safe full-body workout:
 
-For the Dumbbell Shoulder Press:
-Start with 25kg and aim for 8 reps to stay within your personal best.
+1. Dumbbell Shoulder Press: Start with 25kg and aim for 8 reps.
+2. Chest Supported Row: Use 30kg dumbbells or machine handles set properly to avoid strain.
+3. Dumbbell Flat Bench Press: Begin at 35kg, go for 6 reps.
 
-For Chest Supported Row:
-Use machine or dumbbells set at 16-20kg, focusing on good form and controlling the movement.
-
-For Dumbbell Flat Bench Press:
-Go with 32.5kg today to keep it challenging yet safe.
-
-This workout will help balance strength across your body without overloading your knees or shoulders. Enjoy your session!",qwen2.5:7b
+This will give you a good full-body workout without putting too much stress on your joints. Enjoy!",qwen2.5:7b

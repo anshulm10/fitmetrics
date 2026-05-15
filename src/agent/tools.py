@@ -13,6 +13,7 @@ SRC = ROOT / "src"
 if str(SRC) not in sys.path:
     sys.path.insert(0, str(SRC))
 
+from src.agent.muscle_filter import filter_exercise_context_records
 from src.agent.router import QueryRoute, QueryRouter
 from src.config import cfg
 from src.embeddings.image_embedder import ImageEmbedder
@@ -200,7 +201,14 @@ class FitnessToolRouter:
         self.injury = InjuryMemoryTool()
         self.strength = StrengthProgressionTool()
 
-    def run(self, query: str, image_path: str | None = None, top_k: int = cfg.retrieval.top_k) -> dict[str, Any]:
+    def run(
+        self,
+        query: str,
+        image_path: str | None = None,
+        top_k: int = cfg.retrieval.top_k,
+        *,
+        skip_injury: bool = False,
+    ) -> dict[str, Any]:
         """Route and execute the appropriate tools for the query."""
         routed = self.router.route(query, image_path=image_path)
         results: list[ToolResult] = []
@@ -219,10 +227,12 @@ class FitnessToolRouter:
             if any(term in query.lower() for term in ("strength", "baseline", "pr", "profile")):
                 results.append(self.strength.run(query, top_k=top_k))
                 results.append(self.text.run(query, top_k=top_k))
-                results.append(self.injury.run(query, top_k=top_k))
+                if not skip_injury:
+                    results.append(self.injury.run(query, top_k=top_k))
             else:
                 results.append(self.text.run(query, top_k=top_k))
-                results.append(self.injury.run(query, top_k=top_k))
+                if not skip_injury:
+                    results.append(self.injury.run(query, top_k=top_k))
                 results.append(self.strength.run(query, top_k=top_k))
 
         flattened: list[dict[str, Any]] = []
@@ -235,6 +245,8 @@ class FitnessToolRouter:
                 seen.add(key)
                 record = {**record, "tool_name": result.tool_name}
                 flattened.append(record)
+
+        flattened = filter_exercise_context_records(query, flattened)
 
         return {
             "route": routed.route.value,

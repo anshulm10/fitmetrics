@@ -22,6 +22,8 @@ def _base_state(**overrides) -> AgentState:
         "query_type": "",
         "image_path": None,
         "retrieved_text_context": [],
+        "exercise_context_records": [],
+        "generation_retrieved_text": None,
         "retrieved_image_context": [],
         "show_images": False,
         "matched_exercise_name": None,
@@ -35,6 +37,7 @@ def _base_state(**overrides) -> AgentState:
         "tool_calls_log": [],
         "final_response": "",
         "conversation_history": [],
+        "skip_injury_lookup": False,
     }
     s.update(overrides)
     return s

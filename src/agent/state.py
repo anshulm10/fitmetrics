@@ -24,7 +24,13 @@ class AgentState(TypedDict):
     image_path : Optional[str]
         Optional filesystem path to a query image (cross_modal queries).
     retrieved_text_context : List[str]
-        Accumulated text documents from semantic search.
+        Accumulated text documents from semantic search (all retrieval branches).
+    exercise_context_records : List[Dict[str, Any]]
+        Raw Chroma-style exercise rows (metadata + document) merged from text and
+        image retrieval; used in context_fusion for muscle-aware filtering.
+    generation_retrieved_text : Optional[List[str]]
+        Exercise document strings after context_fusion filtering; generation prefers
+        this over retrieved_text_context when set (non-greeting paths).
     retrieved_image_context : List[str]
         Accumulated image documents from CLIP search.
     show_images : bool
@@ -54,12 +60,17 @@ class AgentState(TypedDict):
     conversation_history : Optional[List[Dict[str, Any]]]
         Last N chat exchanges passed in from the UI for follow-up context.
         Each item is {"role": "user"|"assistant", "content": "..."}.
+    skip_injury_lookup : bool
+        When True, ``route_by_query_type`` omits ``injury_lookup`` even for
+        injury-keyword personalized queries (evaluation ablation only).
     """
 
     query: str
     query_type: str
     image_path: Optional[str]
     retrieved_text_context: Annotated[List[str], operator.add]
+    exercise_context_records: Annotated[List[Dict[str, Any]], operator.add]
+    generation_retrieved_text: Optional[List[str]]
     retrieved_image_context: Annotated[List[str], operator.add]
     show_images: bool
     matched_exercise_name: Optional[str]
@@ -73,3 +84,4 @@ class AgentState(TypedDict):
     tool_calls_log: Annotated[List[str], operator.add]
     final_response: str
     conversation_history: Optional[List[Dict[str, Any]]]
+    skip_injury_lookup: bool

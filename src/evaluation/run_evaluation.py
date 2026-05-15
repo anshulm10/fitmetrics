@@ -4,36 +4,26 @@ Evaluation harness for the fit_support multimodal fitness agent.
 Runs four system conditions against benchmark_queries.json and writes
 results to data/eval/results.csv:
 
-  1. plain_llm_baseline         — no retrieval, generic response
-  2. text_only_retrieval        — semantic text search only
-  3. full_multimodal_agent      — full LangGraph agent (all tools active)
-  4. ablation_no_injury         — full agent with injury_lookup node disabled
+  1. plain_llm_baseline   — same LLM as production, **no retrieval**: one direct
+     generate call with a no-database system prompt (no LangGraph).
+  2. text_only_retrieval  — Chroma text (+ image NN for cross-modal items)
+     then a **direct LLM** call conditioned only on those snippets (no full graph).
+  3. full_multimodal_agent — compiled LangGraph + production generation.
+  4. ablation_no_injury    — same graph **without** ``injury_lookup`` in routing,
+     and ``FitnessToolRouter`` skips injury tools; metrics use the same stripped
+     record list as before.
 
 Metrics per query × condition:
-  - recall_at_k            Recall@3 against relevant_ids
-  - mrr                    Mean Reciprocal Rank
-  - personalization_score  1–5 rubric based on record types used
-  - relevance_score        1–5 rubric based on recall
-  - groundedness_score     1–5 rubric — how much of the response is traceable
-                           to retrieved context (exercise names cited)
-  - latency_ms             Wall-clock retrieval time
-  - tool_calls_count       Number of tools fired (from AgentState.tool_calls_log)
+  - recall_at_k / mrr      From retrieved records vs benchmark ``relevant_ids``.
+  - relevance_score       Integer 1–5 **derived from retrieval recall** (not an LLM judge).
+  - personalization_score Heuristic from ``record_type`` mix + category.
+  - groundedness_score    Heuristic: share of retrieved exercise names cited in
+    ``final_response`` (baseline variant is always 1 by definition).
+  - latency_ms             End-to-end for that variant (includes eval LLM calls).
+  - tool_calls_count       Retrieval tools only; baseline eval uses 0.
 
-Per-family metrics reported:
-  - factual_retrieval       : avg Recall@3, avg MRR
-  - cross_modal             : avg Recall@3, avg MRR
-  - analytical              : avg Relevance, avg Personalization
-  - personalized_followup   : avg Relevance, avg Personalization
-
-LLM-as-judge prompt (groundedness dimension):
-  Score 3 — Groundedness (1-5):
-  Is the response grounded in the retrieved context?
-  1 = response ignores retrieved context entirely
-  3 = partially uses retrieved context
-  5 = every claim traceable to retrieved context
-
-  Implemented here as a deterministic heuristic: fraction of retrieved
-  exercise names that appear verbatim in the final_response, mapped to 1–5.
+The README Appendix A prompt describes an optional **human/LLM judge** rubric;
+this script does not call a separate judge model for the CSV columns above.
 """
 from __future__ import annotations
 
@@ -47,12 +37,11 @@ from typing import Any
 import pandas as pd
 
 ROOT = Path(__file__).resolve().parents[2]
-SRC = ROOT / "src"
-if str(SRC) not in sys.path:
-    sys.path.insert(0, str(SRC))
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
 
-from src.agent.graph import run_graph, run_graph_with_model
-from src.agent.router import QueryRouter
+from src.agent.graph import call_gemini, call_ollama, run_graph, run_graph_with_model
+from src.agent.muscle_filter import filter_exercise_context_records
 from src.agent.tools import FitnessToolRouter
 from src.config import cfg
 from src.embeddings.image_embedder import ImageEmbedder
@@ -90,6 +79,62 @@ _FAMILY_FAIL_REASON = {
     "analytical": "multi-hop needs full tool stack",
     "personalized_followup": "injury context critical for safety advice",
 }
+
+_PLAIN_BASELINE_SYSTEM = (
+    "You are a fitness coach. You have NO access to the user's workout database, "
+    "injury files, retrieval results, or uploaded images for this question. "
+    "Answer from general knowledge only. If they ask for personal numbers or "
+    "what they personally lifted, say you do not have their logs and give safe "
+    "general guidance. At most 5 short sentences. Do not use bullet lists."
+)
+
+_TEXT_ONLY_EVAL_SYSTEM = (
+    "You are FitSupport. Use ONLY the provided retrieved text snippets; they may "
+    "be incomplete. Do not invent the user's personal bests unless they appear in "
+    "the snippets. At most 5 short sentences. Do not use bullet lists."
+)
+
+
+def _eval_model_tag(model: str | None) -> str:
+    return (model or cfg.llm.primary_model or "").strip()
+
+
+def _eval_provider_and_api_model(model_tag: str) -> tuple[str, str]:
+    sel = model_tag.lower()
+    if sel in {"gemini", "google"} or sel.startswith("gemini"):
+        return "gemini", cfg.llm.gemini_model
+    return "ollama", model_tag
+
+
+def _eval_llm(user_prompt: str, system_prompt: str, model: str | None) -> str:
+    tag = _eval_model_tag(model)
+    provider, api_model = _eval_provider_and_api_model(tag)
+    if provider == "gemini":
+        return call_gemini(user_prompt, system_prompt, api_model, timeout=300)
+    return call_ollama(user_prompt, system_prompt, api_model, timeout=300)
+
+
+def _format_records_for_eval_prompt(records: list[dict[str, Any]], limit: int) -> str:
+    parts: list[str] = []
+    for r in records[:limit]:
+        doc = str(r.get("document", "")).strip()
+        if doc:
+            parts.append(doc)
+    return "\n---\n".join(parts) if parts else "(no retrieved text)"
+
+
+def _generate_plain_baseline_answer(query: str, model: str | None) -> str:
+    return _eval_llm(f"User question:\n{query}", _PLAIN_BASELINE_SYSTEM, model)
+
+
+def _generate_text_only_answer(query: str, records: list[dict[str, Any]], model: str | None) -> str:
+    cap = max(cfg.retrieval.top_k, 3) * 3
+    ctx = _format_records_for_eval_prompt(records, cap)
+    return _eval_llm(
+        f"User question:\n{query}\n\nRetrieved snippets:\n{ctx}",
+        _TEXT_ONLY_EVAL_SYSTEM,
+        model,
+    )
 
 
 # ── data helpers ───────────────────────────────────────────────────────────────
@@ -212,7 +257,11 @@ def _personalization_score(
     if variant == "plain_llm_baseline":
         return 1
     record_types = {str((r.get("metadata") or {}).get("record_type", "")) for r in records}
-    has_strength = "strength_progression" in record_types or "lift_history" in record_types
+    has_strength = (
+        "strength_progression" in record_types
+        or "lift_history" in record_types
+        or "lift_record" in record_types
+    )
     has_injury = "injury_memory" in record_types
     has_image = "exercise_image" in record_types
 
@@ -298,21 +347,24 @@ def _ablation_no_injury(
     tool_router: FitnessToolRouter,
     model: str | None = None,
 ) -> tuple[list[dict[str, Any]], str, int, str]:
-    """Run the full multimodal agent but strip injury_lookup records from results.
+    """Run the full multimodal agent without injury retrieval in graph or tool merge.
 
-    Returns (records, route, tool_calls_count, final_response).  The
-    tool_calls_count still reflects how many tools the graph tried to fire;
-    injury records are simply excluded from the returned context so the
-    downstream scorer sees a world without injury awareness.
+    ``injury_lookup`` is omitted from routing when ``skip_injury_lookup`` is set on
+    the graph state, and ``FitnessToolRouter`` skips injury tools so evaluation
+    records align with what the model could condition on without injury memory.
     """
     if model is not None:
-        state = run_graph_with_model(query, model=model, image_path=image_path)
+        state = run_graph_with_model(
+            query, model=model, image_path=image_path, skip_injury_lookup=True
+        )
     else:
-        state = run_graph(query, image_path=image_path)
+        state = run_graph(query, image_path=image_path, skip_injury_lookup=True)
     route = state["query_type"]
     tool_calls = len(state["tool_calls_log"])
 
-    result = tool_router.run(query, image_path=image_path, top_k=cfg.retrieval.top_k)
+    result = tool_router.run(
+        query, image_path=image_path, top_k=cfg.retrieval.top_k, skip_injury=True
+    )
     records = [
         r for r in result["records"]
         if str((r.get("metadata") or {}).get("record_type", "")) != "injury_memory"
@@ -346,6 +398,7 @@ def _evaluate_variant(
 
     if variant == "plain_llm_baseline":
         records = _plain_baseline(query)
+        final_response = _generate_plain_baseline_answer(query, model)
 
     elif variant == "text_only_retrieval":
         records = search_exercise_by_text(
@@ -367,6 +420,8 @@ def _evaluate_variant(
                 cap = max(cfg.retrieval.top_k, 3) * 3
                 records = _merge_recall_records(img_recs, records, limit=cap)
                 tool_calls_count = 2
+        records = filter_exercise_context_records(query, list(records))
+        final_response = _generate_text_only_answer(query, records, model)
 
     elif variant == "full_multimodal_agent":
         if model is not None:
@@ -376,7 +431,9 @@ def _evaluate_variant(
         route = state["query_type"]
         tool_calls_count = len(state["tool_calls_log"])
         final_response = state.get("final_response", "")
-        result = tool_router.run(query, image_path=image_path, top_k=cfg.retrieval.top_k)
+        result = tool_router.run(
+            query, image_path=image_path, top_k=cfg.retrieval.top_k, skip_injury=False
+        )
         records = list(result["records"])
 
     elif variant == "ablation_no_injury":
@@ -387,23 +444,28 @@ def _evaluate_variant(
     else:
         raise ValueError(f"Unknown variant: {variant!r}")
 
+    if variant not in ("plain_llm_baseline", "text_only_retrieval"):
+        records = filter_exercise_context_records(query, list(records))
+
     latency_ms = (time.perf_counter() - start) * 1000
 
     retrieved_names = [_exercise_from_record(r) for r in records[:cfg.retrieval.top_k]]
     expected_norm = [_norm(e) for e in expected]
     retrieved_norm = [_norm(n) for n in retrieved_names]
 
+    reported_route = route if route is not None else str(category)
+
     return {
         "query_id": query_id,
         "category": category,
         "system_name": variant,
-        "query_type": route or QueryRouter().route(query, image_path=image_path).route.value,
+        "query_type": reported_route,
         "query": query,
         "relevant_ids": "|".join(expected),
         "retrieved_top3": "|".join(retrieved_names),
         "recall_at_k": round(recall_at_k(records, expected), 4),
         "mrr": round(mean_reciprocal_rank(expected_norm, retrieved_norm), 4),
-        "personalization_score": _personalization_score(variant, category, records, route),
+        "personalization_score": _personalization_score(variant, category, records, reported_route),
         "relevance_score": _response_relevance(records, expected),
         "groundedness_score": _groundedness_score(variant, records, final_response),
         "latency_ms": round(latency_ms, 2),
