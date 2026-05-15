@@ -25,6 +25,8 @@ def _base_state(**overrides) -> AgentState:
         "retrieved_image_context": [],
         "show_images": False,
         "matched_exercise_name": None,
+        "identified_exercise": None,
+        "exercise_confidence": None,
         "image_identification_note": None,
         "node_timings": {},
         "recall_at_3": None,
